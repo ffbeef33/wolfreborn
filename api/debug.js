@@ -1,6 +1,7 @@
 // File: /api/debug.js
-// export default function handler(request, response) { // Dùng nếu cấu hình Vercel là ES Module
-module.exports = (request, response) => { // Dùng nếu cấu hình Vercel là CommonJS
+// SỬ DỤNG CÚ PHÁP ESM (export default)
+
+export default function handler(request, response) {
   try {
     const envVars = {
       // Firebase
@@ -43,7 +44,7 @@ module.exports = (request, response) => { // Dùng nếu cấu hình Vercel là 
       envVars.googleParseError = e.message;
     }
 
-    response.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for debug
+    response.setHeader('Access-Control-Allow-Origin', '*');
     response.status(200).json({
       message: "Environment Variable Check",
       variables: envVars,

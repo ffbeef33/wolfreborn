@@ -1,7 +1,8 @@
 // File: /api/room.js
-// Sử dụng Firebase Admin SDK để đọc dữ liệu phòng từ Firebase RTDB
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getDatabase } = require('firebase-admin/database');
+// SỬ DỤNG CÚ PHÁP ESM (import/export)
+
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getDatabase } from 'firebase-admin/database';
 
 // --- Hàm lấy credentials Firebase từ biến môi trường ---
 function getFirebaseCredentials() {
@@ -30,15 +31,12 @@ try {
     }
 } catch (error) {
     console.error("Firebase admin initialization error:", error.stack);
-    // Ghi log lỗi nhưng không chặn server khởi động nếu có thể
 }
 
 
 // --- Hàm xử lý chính ---
-// Thay đổi thành module.exports nếu không dùng ES Modules hoặc dùng require
-// export default async function handler(request, response) { // Dùng nếu cấu hình Vercel là ES Module
-module.exports = async (request, response) => { // Dùng nếu cấu hình Vercel là CommonJS
-    response.setHeader('Access-Control-Allow-Origin', '*'); // Cho phép CORS nếu cần
+export default async function handler(request, response) {
+    response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -51,7 +49,6 @@ module.exports = async (request, response) => { // Dùng nếu cấu hình Verce
     }
 
     try {
-        // Kiểm tra lại SDK đã khởi tạo chưa
         if (!getApps().length) {
              console.error("Firebase Admin SDK not initialized before handling request.");
              return response.status(500).json({ error: 'Firebase Admin SDK is not initialized.' });
@@ -63,26 +60,22 @@ module.exports = async (request, response) => { // Dùng nếu cấu hình Verce
         const allRoomsData = snapshot.val();
 
         if (!allRoomsData) {
-            return response.status(200).json([]); // Trả về mảng rỗng nếu không có phòng nào
+            return response.status(200).json([]);
         }
 
-        // Lọc và định dạng lại dữ liệu phòng để gửi về client
         const activeRooms = Object.keys(allRoomsData)
             .map(roomId => {
                 const roomData = allRoomsData[roomId];
-                // Chỉ lấy những thông tin cần thiết cho Lobby
                 return {
                     id: roomId,
-                    isPrivate: roomData.isPrivate || false, // Thêm trường này
+                    isPrivate: roomData.isPrivate || false,
                     playerCount: roomData.players ? Object.keys(roomData.players).length : 0,
-                    maxPlayers: roomData.maxPlayers || 0, // Có thể thêm maxPlayers nếu có
-                    status: roomData.gameState?.phase || 'waiting', // Lấy trạng thái game
-                    createdAt: roomData.createdAt || 0, // Giữ lại để sắp xếp nếu cần
+                    maxPlayers: roomData.maxPlayers || 0,
+                    status: roomData.gameState?.phase || 'waiting',
+                    createdAt: roomData.createdAt || 0,
                 };
             })
-             // Có thể lọc bỏ những phòng đã kết thúc nếu cần
             .filter(room => room.status !== 'GAME_END')
-            // Sắp xếp theo thời gian tạo, mới nhất lên đầu
             .sort((a, b) => b.createdAt - a.createdAt);
 
         return response.status(200).json(activeRooms);
