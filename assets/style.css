@@ -10,7 +10,6 @@
     --input-bg: #21262c;
     --border-color: #30363d;
     --success-color: #2ea043;
-    --danger-bg: #f85149; /* Thêm màu lỗi */
 }
 
 body {
@@ -82,12 +81,6 @@ body {
     transform: translateY(-2px);
 }
 
-.login-button:disabled {
-    background-color: #555;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
 .password-label {
     display: block;
     text-align: left;
@@ -103,7 +96,7 @@ body {
 }
 
 .error-message {
-    color: var(--danger-bg);
+    color: #f85149; /* Màu đỏ cho lỗi */
 }
 
 .message {
@@ -129,9 +122,3 @@ body {
 .toggle-form-text a:hover {
     text-decoration: underline;
 }
-
-/* Loại bỏ phần Super Admin khỏi trang index chính */
-.admin-section {
-    display: none;
-}
-
