@@ -1,0 +1,124 @@
+:root {
+    /* Chủ đạo Copilot/GitHub dark */
+    --primary-bg: #0d1117;
+    --secondary-bg: #161b22;
+    --card-bg: #161b22;
+    --text-color: #58a6ff;
+    --light-text: #c9d1d9;
+    --button-bg: #238636;
+    --button-hover-bg: #2ea043;
+    --input-bg: #21262c;
+    --border-color: #30363d;
+    --success-color: #2ea043;
+}
+
+body {
+    font-family: 'Montserrat', 'Segoe UI', 'Arial', sans-serif;
+    background-color: var(--primary-bg);
+    color: var(--light-text);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    text-align: center;
+}
+
+.container {
+    width: 100%;
+    max-width: 500px;
+    padding: 20px;
+    background-color: var(--secondary-bg);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+}
+
+.title {
+    color: var(--text-color);
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.welcome-text {
+    font-size: 1rem;
+    margin-bottom: 30px;
+    color: var(--light-text);
+}
+
+.login-section {
+    margin-bottom: 20px;
+}
+
+.login-title {
+    font-size: 1.5rem;
+    color: var(--light-text);
+    margin-bottom: 20px;
+}
+
+.password-input, .login-button {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--input-bg);
+    color: var(--light-text);
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.login-button {
+    border: none;
+    background-color: var(--button-bg);
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.login-button:hover {
+    background-color: var(--button-hover-bg);
+    transform: translateY(-2px);
+}
+
+.password-label {
+    display: block;
+    text-align: left;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.error-message, .message {
+    font-weight: 500;
+    min-height: 20px;
+    margin-top: -5px;
+    margin-bottom: 10px;
+}
+
+.error-message {
+    color: #f85149;
+}
+
+.message {
+    color: var(--success-color);
+}
+
+.hidden {
+    display: none;
+}
+
+.toggle-form-text {
+    margin-top: 15px;
+    font-size: 0.9rem;
+}
+
+.toggle-form-text a {
+    color: var(--text-color);
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.toggle-form-text a:hover {
+    text-decoration: underline;
+}

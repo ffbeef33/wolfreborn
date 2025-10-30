@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Board Game Ma Sói</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="form-wrapper">
+      <div id="login-view">
+        <h1 class="title">Board Game Ma Sói</h1>
+        <p class="welcome-text">Đăng nhập hoặc đăng ký để tham gia!</p>
+
+        <div class="login-section">
+          <h2 class="login-title">👤 Đăng Nhập</h2>
+          <p class="password-label">Mật khẩu</p>
+          <input type="password" id="playerPassword" class="password-input" placeholder="Nhập mật khẩu của bạn">
+          <button id="loginButton" class="login-button">Vào Game</button>
+          <p id="loginError" class="error-message"></p>
+        </div>
+        <p class="toggle-form-text">Chưa có tài khoản? <a href="#" id="show-register-link">Đăng ký ngay</a></p>
+      </div>
+
+      <div id="register-view" class="hidden">
+        <h1 class="title">Đăng Ký Tài Khoản</h1>
+        <p class="welcome-text">Tham gia vào cộng đồng ma sói!</p>
+
+        <div class="login-section">
+          <h2 class="login-title">📝 Tạo Tài Khoản Mới</h2>
+          <p class="password-label">Tên người chơi</p>
+          <input type="text" id="newUsername" class="password-input" placeholder="Nhập tên bạn muốn dùng">
+          <p class="password-label">Mật khẩu</p>
+          <input type="password" id="newPassword" class="password-input" placeholder="Tạo mật khẩu cho bạn">
+          <button id="registerButton" class="login-button">Tạo Tài Khoản</button>
+          <p id="registerMessage" class="message"></p>
+        </div>
+        <p class="toggle-form-text">Đã có tài khoản? <a href="#" id="show-login-link">Quay lại đăng nhập</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

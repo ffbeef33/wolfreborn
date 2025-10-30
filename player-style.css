@@ -1,0 +1,652 @@
+:root {
+    /* Chủ đạo GitHub Copilot dark */
+    --primary-bg: #0d1117;
+    --secondary-bg: #161b22;
+    --card-bg: #161b22;
+    --text-color: #58a6ff;
+    --light-text: #c9d1d9;
+    --button-bg: #238636;
+    --button-hover-bg: #2ea043;
+    --input-bg: #161b22;
+    --border-color: #30363d;
+    --secondary-button-bg: #21262c;
+    --secondary-button-hover-bg: #30363d;
+    --danger-bg: #f85149;
+    --danger-hover-bg: #c73c3c;
+
+    /* Bộ màu mới cho các phe */
+    --wolf-color: #f85149;       /* Đỏ cảnh báo */
+    --villager-color: #238636;   /* Xanh lá nổi bật */
+    --neutral-color: #d29922;    /* Vàng trung lập (Phe thứ ba) */
+
+    --font-main: 'Roboto', 'Segoe UI', 'Arial', sans-serif;
+    --font-display: 'Montserrat', 'Segoe UI', 'Arial', sans-serif;
+    --border-radius: 12px;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: var(--primary-bg);
+    color: var(--light-text);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+/* --- SECTIONS & CARDS --- */
+section.card {
+    background-color: var(--card-bg);
+    padding: 20px 25px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+    margin-bottom: 20px;
+}
+.hidden {
+    display: none !important;
+}
+
+/* --- UI Chung --- */
+.password-input {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--input-bg);
+    color: var(--light-text);
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--button-bg);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    margin-top: 10px;
+}
+button:hover:not(:disabled) {
+    background-color: var(--button-hover-bg);
+    transform: translateY(-2px);
+}
+button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+button.btn-secondary {
+    background-color: var(--secondary-button-bg);
+}
+button.btn-secondary:hover:not(:disabled) {
+    background-color: var(--secondary-button-hover-bg);
+}
+button.btn-danger {
+    background-color: var(--danger-bg);
+}
+button.btn-danger:hover:not(:disabled) {
+    background-color: var(--danger-hover-bg);
+}
+
+.error-message {
+    color: var(--danger-bg);
+    margin-top: 15px;
+    min-height: 1.2em;
+    font-weight: 500;
+}
+
+/* --- LOBBY & GAME ROOM --- */
+.player-header { margin-bottom: 20px; }
+.player-header h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 2.2rem;
+    color: var(--text-color);
+    margin: 0;
+}
+.player-header p { font-size: 1rem; color: var(--light-text); margin: 5px 0 0; }
+.game-card { border-radius: var(--border-radius); }
+
+#room-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    text-align: left;
+}
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.room-item:last-child { border-bottom: none; }
+.room-item:hover { background-color: var(--secondary-button-hover-bg); }
+.room-item span { font-weight: bold; }
+.room-item .room-name { color: var(--text-color); }
+.room-item .room-status { font-size: 0.9em; }
+
+/* --- HOST CONTROLS & PLAYER LIST --- */
+#host-controls {
+    border-top: 3px solid var(--text-color);
+}
+#host-controls h3 {
+    color: var(--text-color);
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#host-controls h4 { margin: 15px 0 10px 0; border-top: 1px solid var(--border-color); padding-top: 15px;}
+#host-controls h5 { margin: 0 0 10px 0; }
+
+/* CSS cho các nút nhỏ */
+#host-controls button, #player-controls button {
+    margin-top: 5px;
+    width: auto;
+    padding: 8px 15px;
+    font-size: 0.9em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 8px;
+}
+
+#role-selection-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    text-align: left;
+}
+/* (Bạn cần thêm CSS cho mục chọn vai trò, tương tự như file admin-style.css cũ nếu muốn) */
+/* .role-selection-item { ... } */
+
+#player-list-section h3 {
+    margin: 0 0 10px 0;
+}
+#player-list-ingame {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+}
+#player-list-ingame li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+#player-list-ingame li:last-child { border-bottom: none; }
+#player-list-ingame .player-kick-btn {
+    padding: 3px 8px;
+    font-size: 0.8em;
+    width: auto;
+    margin: 0;
+    background-color: var(--danger-bg);
+}
+
+/* --- WAITING STATE --- */
+.waiting-card { padding: 20px; }
+.waiting-card h2 { color: var(--light-text); }
+.waiting-message { color: var(--light-text); opacity: 0.8; }
+.spinner { width: 50px; height: 50px; border: 5px solid #444; border-top-color: var(--text-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- PHASE DISPLAY (DAY/VOTE RESULT) --- */
+#phase-display-section {
+    padding: 20px;
+    text-align: center;
+}
+#phase-display-section h2 { color: var(--text-color); margin: 0 0 10px 0; }
+#phase-display-section .timer { font-size: 1.1rem; color: var(--light-text); margin-bottom: 20px; }
+#phase-display-section #phase-message { font-size: 1rem; font-style: italic; }
+#phase-display-section #phase-results {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--wolf-color); /* Màu đỏ cho thông báo chết */
+}
+
+/* --- ROLE REVEAL CARD --- */
+.role-card { perspective: 1000px; cursor: pointer; background-color: transparent; }
+.card-inner { position: relative; width: 100%; height: 480px; transition: transform 0.8s; transform-style: preserve-3d; }
+.role-card.is-flipped .card-inner { transform: rotateY(180deg); }
+.card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: var(--border-radius); background: linear-gradient(145deg, var(--card-bg), var(--secondary-bg)); border: 1px solid var(--border-color); }
+.card-front .card-logo { font-family: var(--font-display); font-size: 8rem; color: var(--text-color); line-height: 1; }
+.card-back { transform: rotateY(180deg); padding: 20px; }
+.role-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.8; }
+#role-name { font-family: var(--font-display); font-weight: 700; font-size: 3rem; margin: 0; color: var(--text-color); }
+.role-faction { font-size: 1rem; font-weight: 500; padding: 5px 15px; border-radius: 20px; margin: 5px 0 15px; color: white; }
+.role-faction.wolf { background-color: var(--wolf-color); }
+.role-faction.villager { background-color: var(--villager-color); }
+.role-faction.neutral { background-color: var(--neutral-color); }
+.role-description { font-size: 0.9rem; color: var(--light-text); }
+
+/* --- HIỂN THỊ DANH SÁCH VAI TRÒ --- */
+.roles-display-container { width: 100%; margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+.role-list-instruction { font-size: 0.9rem; color: var(--light-text); opacity: 0.8; font-style: italic; margin: 0 0 8px 0; padding: 8px; background-color: #21262c; border-radius: 8px; }
+.faction-box { border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 16px; background-color: #161b22; text-align: center; transition: all 0.3s ease; }
+.faction-title { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid rgba(237, 242, 244, 0.2); letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.roles-list { display: flex; flex-direction: column; gap: 8px; }
+.in-game-role-item { margin: 0; font-size: 1rem; color: var(--light-text); cursor: pointer; transition: color 0.2s; }
+.in-game-role-item:hover { color: var(--text-color); }
+.faction-box.faction-villager { background-color: rgba(35, 134, 54, 0.12); border-color: rgba(35, 134, 54, 0.7); }
+.faction-box.faction-villager .faction-title { color: var(--villager-color); }
+.faction-box.faction-wolf { background-color: rgba(248, 81, 73, 0.12); border-color: rgba(248, 81, 73, 0.7); }
+.faction-box.faction-wolf .faction-title { color: var(--wolf-color); }
+.faction-box.faction-neutral { background-color: rgba(210, 153, 34, 0.12); border-color: rgba(210, 153, 34, 0.7); }
+.faction-box.faction-neutral .faction-title { color: var(--neutral-color); }
+
+/* --- MODAL CHUNG --- */
+.modal { position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(13,17,23,0.92); display: flex; justify-content: center; align-items: center; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal-content { background-color: var(--card-bg); padding: 30px; border: 1px solid var(--border-color); width: 90%; max-width: 450px; border-radius: var(--border-radius); position: relative; box-shadow: 0 8px 30px rgba(0,0,0,0.5); text-align: left; }
+.close-modal-btn { color: var(--light-text); position: absolute; top: 10px; right: 20px; font-size: 32px; font-weight: bold; cursor: pointer; transition: color 0.2s; }
+.close-modal-btn:hover { color: var(--text-color); }
+#modal-role-name { font-family: var(--font-display); font-weight: 700; font-size: 2.5rem; margin: 0 0 5px 0; color: var(--text-color); }
+#modal-role-faction { margin: 0 0 20px 0; color: var(--light-text); font-style: italic; }
+#modal-role-description { font-size: 1rem; line-height: 1.7; }
+
+/* --- MODULE VOTE --- */
+#voting-ui-section h2 { color: var(--text-color); font-size: 1.8rem; margin-bottom: 10px; }
+#voting-ui-section .timer { font-size: 1.1rem; color: var(--light-text); margin-bottom: 20px; }
+.choices-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 15px; }
+.choices-grid .choice-btn { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--secondary-bg); color: var(--light-text); font-size: 1.1rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+.choices-grid .choice-btn:hover:not(:disabled) { background-color: var(--secondary-button-hover-bg); border-color: var(--text-color); color: var(--text-color); }
+.choices-grid .choice-btn.btn-secondary { background-color: var(--secondary-button-bg); }
+.choices-grid .choice-btn.btn-secondary:hover:not(:disabled) { background-color: var(--secondary-button-hover-bg); }
+.choice-status-message { color: var(--light-text); opacity: 0.8; margin-top: 15px; font-style: italic; min-height: 1.2em; }
+.choices-grid .choice-btn.selected { border-color: var(--text-color); background-color: #1d3350; color: #fff; box-shadow: 0 0 8px var(--text-color); transform: translateY(-2px); }
+
+/* --- GIAO DIỆN DI CHÚC --- */
+#player-controls {
+    margin-top: 20px;
+    text-align: left;
+}
+.player-action-btn {
+    background-color: var(--secondary-button-bg);
+    border: 1px solid var(--border-color);
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.player-action-btn:hover:not(:disabled) {
+    background-color: var(--secondary-button-hover-bg);
+    border-color: var(--text-color);
+}
+.player-action-btn:disabled {
+    background-color: var(--secondary-bg);
+    border-color: var(--border-color);
+    opacity: 0.6;
+}
+#will-writing-modal .modal-content {
+    text-align: center;
+}
+#will-writing-modal h2 {
+    color: var(--text-color);
+    margin: 0 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+#will-writing-modal p {
+    text-align: left;
+    margin-bottom: 15px;
+    opacity: 0.8;
+}
+#will-textarea {
+    width: 100%;
+    height: 150px;
+    background-color: var(--primary-bg);
+    border: 1px solid var(--border-color);
+    color: var(--light-text);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 1rem;
+    resize: vertical;
+    margin-bottom: 5px;
+}
+.word-count {
+    text-align: right;
+    font-size: 0.9rem;
+    opacity: 0.7;
+    margin-bottom: 15px;
+}
+#save-will-btn {
+    width: 100%;
+}
+#published-will-modal h2 {
+    color: var(--text-color);
+    text-align: center;
+    margin-bottom: 20px;
+}
+.will-content-display {
+    background-color: var(--primary-bg);
+    padding: 15px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* --- NHẬT KÝ RIÊNG --- */
+#private-log-section {
+    margin-top: 20px;
+    text-align: left;
+}
+#private-log-section h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--neutral-color);
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#private-log-content .log-entry {
+    background-color: var(--primary-bg);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--neutral-color);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+#private-log-content .log-entry:last-child {
+    margin-bottom: 0;
+}
+
+/* ===================================================================
+   === GIAO DIỆN ĐIỀU KHIỂN ĐÊM (NIGHT ACTION PANEL) ===
+   =================================================================== */
+
+.night-action-panel {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    border-top: 4px solid var(--text-color);
+    padding: 20px;
+    animation: slideUp 0.5s ease-out;
+    margin-top: 20px;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-header {
+    text-align: left;
+    margin-bottom: 20px;
+}
+.panel-header h2 {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    color: var(--text-color);
+    margin: 0 0 5px 0;
+}
+.panel-header p {
+    font-size: 0.95rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+.action-tabs {
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 20px;
+}
+.tab-btn {
+    padding: 10px 15px;
+    border: none;
+    background-color: transparent;
+    color: var(--light-text);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    margin: 0;
+    width: auto; /* Ghi đè button width 100% */
+}
+.tab-btn:hover {
+    background-color: var(--secondary-button-hover-bg);
+}
+.tab-btn.active {
+    color: var(--text-color);
+    border-bottom-color: var(--text-color);
+}
+
+.target-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+.target-card {
+    background-color: var(--secondary-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+}
+.target-card:hover {
+    border-color: var(--text-color);
+    transform: translateY(-3px);
+}
+.target-card.selected {
+    border-color: var(--text-color);
+    background-color: #1f2c3d;
+    box-shadow: 0 0 10px var(--text-color);
+}
+.target-card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--secondary-button-bg);
+}
+.target-card.disabled:hover {
+    transform: none;
+    border-color: var(--border-color);
+}
+.target-card .player-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+.wolf-vote-count {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background-color: var(--wolf-color);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.panel-footer {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.action-locked-overlay {
+    text-align: center;
+    padding: 30px;
+}
+.action-locked-overlay .icon {
+    font-size: 3rem;
+    color: var(--button-bg);
+    margin-bottom: 15px;
+}
+.action-locked-overlay h3 { color: var(--light-text); }
+.action-locked-overlay p { color: var(--text-color); font-weight: 600; font-size: 1.1rem; }
+
+/* --- GIAO DIỆN CHỜ (KHÔNG CÓ CHỨC NĂNG) --- */
+.resting-panel {
+    border-top-color: var(--secondary-button-hover-bg);
+    text-align: center;
+}
+.resting-panel .panel-header h2 {
+    color: var(--light-text);
+    opacity: 0.8;
+}
+.atmospheric-message {
+    font-size: 1.1rem;
+    font-style: italic;
+    color: var(--text-color);
+    opacity: 0.9;
+    padding: 15px;
+    background-color: var(--primary-bg);
+    border-radius: 8px;
+    margin-top: 10px;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-left: 3px solid var(--text-color);
+}
+.resting-info p {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    margin-top: 20px;
+}
+
+/* --- GIAO DIỆN CHAT --- */
+#chat-section h3 {
+    text-align: left;
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#chat-channels {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+.channel-btn {
+    padding: 8px 12px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background-color: transparent;
+    color: var(--light-text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 0;
+    width: auto; /* Ghi đè button width 100% */
+}
+.channel-btn:hover {
+    background-color: var(--secondary-button-hover-bg);
+}
+.channel-btn.active {
+    color: var(--text-color);
+    border-bottom-color: var(--text-color);
+}
+.channel-btn[data-channel="dead"] { color: #888; }
+.channel-btn[data-channel="wolves"] { color: var(--wolf-color); }
+.channel-btn[data-channel="dead"].active { border-bottom-color: #888; }
+.channel-btn[data-channel="wolves"].active { border-bottom-color: var(--wolf-color); }
+
+#chat-messages {
+    height: 200px;
+    overflow-y: scroll;
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: var(--primary-bg);
+    text-align: left;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.message-item { margin-bottom: 8px; }
+.message-sender { font-weight: bold; }
+/* Thêm màu cho các kênh chat */
+.message-item[data-channel="wolves"] .message-sender { color: var(--wolf-color); }
+.message-item[data-channel="dead"] .message-sender { color: #888; }
+.message-item[data-channel="living"] .message-sender { color: var(--text-color); }
+
+#chat-input { display: flex; gap: 10px; }
+#chat-input input { flex-grow: 1; margin: 0; }
+#chat-input button { width: auto; margin: 0; }
+
+/* Modal đặc biệt của Phù thủy */
+.witch-choice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 10px;
+}
+.witch-choice-btn {
+    padding: 20px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    border: 2px solid var(--border-color);
+    background-color: var(--secondary-button-bg);
+    color: var(--light-text);
+    width: 100%;
+    margin: 0;
+}
+.witch-choice-btn i { font-size: 2rem; }
+.witch-choice-btn.kill { color: var(--wolf-color); border-color: var(--wolf-color); }
+.witch-choice-btn.save { color: var(--villager-color); border-color: var(--villager-color); }
+.witch-choice-btn:disabled {
+    background-color: var(--primary-bg);
+    opacity: 0.4;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+.witch-choice-btn:disabled:hover {
+    transform: none;
+}
