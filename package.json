@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "An automated web-based werewolf game using Firebase, Google Sheets, and Vercel.",
   "private": true,
+  "type": "module",
   "scripts": {
     "start": "node --version",
     "dev": "vercel dev",
