@@ -735,7 +735,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (!phaseDisplaySection.classList.contains('hidden')) {
             visibleTimerDisplay = phaseTimerDisplay;
         } else if (!roleRevealSection.classList.contains('hidden')) {
-            // Có thể thêm timer cho role reveal nếu muốn
+            // *** SỬA LỖI 1: Thêm timer cho Role Reveal ***
+            visibleTimerDisplay = getEl('role-reveal-timer-display');
+        
+        // *** SỬA LỖI 2: Thêm timer cho Night Phase (Hành động đêm) ***
+        } else if (!interactiveActionSection.classList.contains('hidden')) {
+            visibleTimerDisplay = getEl('night-phase-timer-display');
         }
         
         if (!visibleTimerDisplay) return;
@@ -780,6 +785,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderNightActions(myPlayerData, nightNum) {
         interactiveActionSection.innerHTML = ''; 
         
+        // *** SỬA LỖI 2: Thêm Timer cho Phase Đêm ***
+        // Tạo và thêm bảng timer vào đầu
+        const timerEl = document.createElement('div');
+        timerEl.className = 'night-timer-display'; // Class này đã có trong player-style.css
+        timerEl.innerHTML = `
+            <h2>Đêm ${nightNum}</h2>
+            <p class="timer">Thời gian còn lại: <strong id="night-phase-timer-display">--</strong></p>
+        `;
+        interactiveActionSection.appendChild(timerEl);
+        // *** KẾT THÚC SỬA LỖI 2 ***
+
         if (!currentRoomData) {
              console.error("renderNightActions: currentRoomData bị null");
              return;
@@ -879,15 +895,17 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị bảng nghỉ ngơi
      */
     function renderRestingPanel() {
-        interactiveActionSection.innerHTML = `
-            <div class="night-action-panel resting-panel">
-                <div class="panel-header">
-                    <h2>Đêm Tĩnh Lặng</h2>
-                </div>
-                <div class="resting-info">
-                    <p>Bạn không có hành động nào đêm nay. Hãy nghỉ ngơi...</p>
-                </div>
+        // *** SỬA LỖI: Thay vì ghi đè innerHTML, hãy tạo và nối thêm element ***
+        const restingPanel = document.createElement('div');
+        restingPanel.className = 'night-action-panel resting-panel';
+        restingPanel.innerHTML = `
+            <div class="panel-header">
+                <h2>Đêm Tĩnh Lặng</h2>
+            </div>
+            <div class="resting-info">
+                <p>Bạn không có hành động nào đêm nay. Hãy nghỉ ngơi...</p>
             </div>`;
+        interactiveActionSection.appendChild(restingPanel);
     }
 
     /**
