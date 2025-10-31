@@ -2,9 +2,9 @@
 // Xử lý tất cả hành động của Host (Tạo, Tham gia, Start, Kick...)
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getDatabase } from 'firebase-admin/database';
-// SỬA LỖI ĐƯỜNG DẪN IMPORT:
-// ../game-engine.js (SAI) -> ./game-engine.js (ĐÚNG)
+// SỬA LỖI 1: Import ServerValue từ firebase-admin/database
+import { getDatabase, ServerValue } from 'firebase-admin/database';
+// SỬA LỖI 2: Sửa đường dẫn import từ '../' thành './'
 import { fetchSheetData, setGamePhase } from './game-engine.js'; 
 
 // --- 1. KHỞI TẠO FIREBASE ADMIN (Singleton Pattern) ---
@@ -64,11 +64,13 @@ export default async function handler(request, response) {
                     hostId: hostPlayerId,
                     isPrivate: isPrivate || false,
                     password: (isPrivate && password) ? password : null,
-                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    // SỬA LỖI 1: Dùng ServerValue
+                    createdAt: ServerValue.TIMESTAMP, 
                     gameState: {
                         phase: 'waiting',
                         duration: 99999,
-                        startTime: firebase.database.ServerValue.TIMESTAMP
+                        // SỬA LỖI 1: Dùng ServerValue
+                        startTime: ServerValue.TIMESTAMP 
                     },
                     players: {
                         [hostPlayerId]: {
@@ -163,7 +165,8 @@ export default async function handler(request, response) {
                         await db.ref(`rooms/${roomId}/publicData/latestAnnouncement`).set({
                             message: "Host đã kết thúc game.",
                             type: 'game_end',
-                            timestamp: firebase.database.ServerValue.TIMESTAMP
+                            // SỬA LỖI 1: Dùng ServerValue
+                            timestamp: ServerValue.TIMESTAMP 
                         });
                         return response.status(200).json({ success: true, message: 'Đã kết thúc game.' });
                     
@@ -225,7 +228,8 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 
     // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
     updates['/gameState/phase'] = 'DAY_1_INTRO';
-    updates['/gameState/startTime'] = firebase.database.ServerValue.TIMESTAMP;
+    // SỬA LỖI 1: Dùng ServerValue
+    updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
     updates['/gameState/duration'] = 15; // 15 giây giới thiệu
     updates['/gameState/nightNumber'] = 1;
     updates['/gameSettings/roles'] = rolesToAssign; // Lưu lại bộ vai trò đã chọn
@@ -270,11 +274,11 @@ async function resetGame(db, roomId, keepRoles) {
     } else {
         // Nếu là "Thiết lập lại", quay về phòng chờ
         updates['/gameState/phase'] = 'waiting';
-        updates['/gameState/startTime'] = firebase.database.ServerValue.TIMESTAMP;
+        // SỬA LỖI 1: Dùng ServerValue
+        updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
         updates['/gameState/duration'] = 99999;
         updates['/gameSettings/roles'] = []; // Xóa bộ vai trò
     }
     
-    await roomRef.update(updates);
+    await db.ref(`rooms/${roomId}`).update(updates);
 }
-

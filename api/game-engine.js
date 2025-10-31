@@ -1,9 +1,11 @@
 // File: /api/game-engine.js
 // Đây là THƯ VIỆN LOGIC GAME, chạy trên backend (Node.js).
+// Nó KHÔNG phải là một endpoint API, mà chỉ export các hàm.
 
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getDatabase } from 'firebase-admin/database';
+// *** ĐÃ SỬA LỖI 1: Import ServerValue ***
+import { getDatabase, ServerValue } from 'firebase-admin/database';
 
 // --- BIẾN TOÀN CỤC (CACHE) ---
 let firebaseAdminApp;
@@ -67,7 +69,7 @@ async function getGoogleSheetsAPI() {
 
 /**
  * Đọc và cache dữ liệu từ Google Sheet.
- * (ĐÃ THÊM 'export' ĐỂ host-actions.js CÓ THỂ SỬ DỤNG)
+ * (ĐÃ SỬA LỖI 2: Thêm 'export')
  */
 export async function fetchSheetData(sheetName) {
     const now = Date.now();
@@ -246,7 +248,8 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
     const db = getDatabase(getFirebaseAdmin());
     const phaseData = {
         phase: newPhase,
-        startTime: firebase.database.ServerValue.TIMESTAMP,
+        // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
+        startTime: ServerValue.TIMESTAMP,
         duration: durationInSeconds
     };
     
@@ -366,7 +369,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     livingPlayerIds.forEach(pId => {
         const status = liveStatus[pId];
         const player = players[pId];
-        if (!isActionActive(status, player.state, currentNightNumber)) return; // Soi vẫn hoạt động khi bị 'freeze' nhưng trả KQ sai
+        // Soi vẫn hoạt động khi bị 'freeze' nhưng trả KQ sai
+        if (!isActionActive(status, player.state, currentNightNumber, true, true)) return; 
         
         const action = status.action;
         const targetId = action.targetId;
@@ -382,7 +386,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
                 // Phe thứ ba giữ nguyên
             }
             // Nếu người soi bị 'freeze' (isDisabled)
-            if (status.isDisabled) {
+            if (status.isDisabled) { 
                 resultFaction = "Phe Dân";
             }
             announcements.private[pId] = `Kết quả soi ${players[targetId].username} là: ${resultFaction}.`;
@@ -425,6 +429,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         }
 
         if (status.role.Kind === 'curse' && action.choice === 'curse') {
+            // Logic Sói Nguyền chỉ hoạt động nếu mục tiêu của nó là mục tiêu Sói cắn
             if (targetId === wolfBiteTargetId) {
                 liveStatus[targetId].isCursed = true;
                 announcements.private[pId] = `Bạn đã chọn Nguyền rủa mục tiêu Sói cắn (${players[targetId].username}).`;
@@ -453,7 +458,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         // Phù thủy chỉ dùng thuốc Cứu 1 lần
         if (status.state.witch_save_used) return;
         // Kiểm tra ReSelect
-        if (!isActionActive(status, player.state, currentNightNumber)) return; 
+        if (!isActionActive(status, player.state, currentNightNumber, true, false)) return; // false = ko check reselect cho witch
 
         const targetId = status.action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
@@ -481,7 +486,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         // Phù thủy chỉ dùng thuốc Giết 1 lần
         if (status.state.witch_kill_used) return;
         // Kiểm tra ReSelect
-        if (!isActionActive(status, player.state, currentNightNumber)) return;
+        if (!isActionActive(status, player.state, currentNightNumber, true, false)) return;
 
         const targetId = status.action.targetId;
         if (liveStatus[targetId]) {
@@ -577,13 +582,16 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 /**
  * Helper function: Kiểm tra xem hành động có được kích hoạt không
  */
-function isActionActive(status, playerState, currentNightNumber, checkReSelect = true) {
+function isActionActive(status, playerState, currentNightNumber, checkReSelect = true, allowWhenDisabled = false) {
     const role = status.role;
     const state = playerState; // Dùng state gốc từ DB
     const action = status.action;
 
     // Không có hành động
     if (!action) return false;
+    
+    // Bị 'freeze'
+    if (!allowWhenDisabled && status.isDisabled) return false; 
 
     // 1. Check Night
     if (role.Night !== 'n' && parseInt(role.Night) > currentNightNumber) {
@@ -645,7 +653,8 @@ async function applyNightResults(roomId, results, nightNumber) {
     });
 
     // 4. Ghi thông báo
-    const timestamp = firebase.database.ServerValue.TIMESTAMP;
+    // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
+    const timestamp = ServerValue.TIMESTAMP;
     // Thông báo công khai
     updates[`/publicData/latestAnnouncement`] = {
         message: results.announcements.public.join(' '),
@@ -727,7 +736,8 @@ async function applyVoteResults(roomId, results) {
     updates[`/publicData/latestAnnouncement`] = {
         message: results.announcement,
         type: 'vote_result',
-        timestamp: firebase.database.ServerValue.TIMESTAMP
+        // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
+        timestamp: ServerValue.TIMESTAMP
     };
 
     await db.ref(`rooms/${roomId}`).update(updates);
@@ -763,7 +773,6 @@ async function checkWinCondition(roomId) {
         // Phe Dân (và Phe thứ ba nếu có) thắng
         return { isEnd: true, winner: "Phe Dân" };
     }
-
     if (wolfCount >= (villagerCount + thirdPartyCount)) {
         // Bầy Sói thắng
         return { isEnd: true, winner: "Bầy Sói" };
@@ -784,6 +793,7 @@ async function announceWinner(roomId, winnerFaction) {
      await db.ref(`rooms/${roomId}/publicData/latestAnnouncement`).set({
          message: message,
          type: 'game_end',
-         timestamp: firebase.database.ServerValue.TIMESTAMP
+         // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
+         timestamp: ServerValue.TIMESTAMP
      });
 }
