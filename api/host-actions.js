@@ -10,7 +10,7 @@ import { fetchSheetData, setGamePhase } from './game-engine.js';
 // --- 1. KHỞI TẠO FIREBASE ADMIN (Singleton Pattern) ---
 let firebaseAdminApp;
 function getFirebaseAdmin() {
-    // Đặt tên riêng cho instance này để tránh xung đột với các API khác
+    // Đặt tên riêng cho instance này để tránh xung đột
     const APP_NAME = 'firebaseAdminHostActions';
     
     if (getApps().find(app => app.name === APP_NAME)) {
@@ -150,7 +150,7 @@ export default async function handler(request, response) {
 
                     case 'start-game':
                         // Lấy gameSettings từ body (do player.js gửi lên)
-                        await handleStartGame(db, roomId, roomData.players, roles);
+                        await handleStartGame(db, roomId, players, roles); // 'players' từ snapshot, 'roles' từ body
                         return response.status(200).json({ success: true, message: 'Game đã bắt đầu.' });
                         
                     case 'skip-phase':
@@ -277,3 +277,4 @@ async function resetGame(db, roomId, keepRoles) {
     
     await roomRef.update(updates);
 }
+
