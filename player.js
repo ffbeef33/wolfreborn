@@ -592,28 +592,35 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const playerCount = parseInt(playerCountInRoom.textContent, 10) || 0;
         
+        // SỬA LỖI: Thêm kiểm tra
         const wolfRoleName = "Sói thường"; 
         if (allRolesData[wolfRoleName]) {
             selectedRoles.push(wolfRoleName);
         } else {
-            console.error("Thiếu vai trò 'Sói thường' trong allRolesData!");
+            console.error("LỖI LOGIC: Không tìm thấy vai trò 'Sói thường' trong allRolesData. Hãy kiểm tra Google Sheet!");
         }
         
         const civilianRoleName = "Dân thường"; 
         const civilianCount = playerCount - selectedRoles.length;
+
         if (allRolesData[civilianRoleName]) {
             for (let i = 0; i < civilianCount; i++) {
                 selectedRoles.push(civilianRoleName);
             }
         } else {
-             console.error("Thiếu vai trò 'Dân thường' trong allRolesData!");
+             console.error("LỖI LOGIC: Không tìm thấy vai trò 'Dân thường' trong allRolesData. Hãy kiểm tra Google Sheet!");
         }
         
         roleCountSelected.textContent = selectedRoles.length;
         
-        database.ref(`rooms/${currentRoomId}/gameSettings`).set({
-            roles: selectedRoles
-        });
+        // Chỉ cập nhật nếu phòng còn tồn tại
+        if (currentRoomId) {
+            database.ref(`rooms/${currentRoomId}/gameSettings`).set({
+                roles: selectedRoles
+            }).catch(err => {
+                console.error("Lỗi khi cập nhật gameSettings:", err);
+            });
+        }
     }
 
     /**
