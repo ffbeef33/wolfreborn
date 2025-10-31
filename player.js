@@ -140,7 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Lấy dữ liệu vai trò 1 lần
         try {
-            const response = await fetch('/api/sheets?sheetName=Roles&v=1');
+            // Thêm cache-busting (phá cache) để luôn lấy dữ liệu mới
+            const response = await fetch('/api/sheets?sheetName=Roles&t=' + Date.now());
             
             if (!response.ok) {
                 const errText = await response.text();
@@ -543,28 +544,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // *** BẮT ĐẦU SỬA LỖI LOGIC ***
+    
     /**
      * Render các checkbox chọn vai trò cho Host
      */
     function renderRoleSelection() {
         roleSelectionGrid.innerHTML = '';
         
-        const defaultRoleNames = {
-            civilian: "Dân thường",
-            wolf: "Sói thường"
-        };
-        
-        const civilianRoleName = Object.keys(allRolesData).find(name => allRolesData[name].RoleName === defaultRoleNames.civilian) || defaultRoleNames.civilian;
-        const wolfRoleName = Object.keys(allRolesData).find(name => allRolesData[name].RoleName === defaultRoleNames.wolf) || defaultRoleNames.wolf;
-
-        const defaultRoles = [civilianRoleName, wolfRoleName];
+        // Đây là tên CHUỖI (STRING) của các vai trò mặc định
+        const defaultRoles = ["Dân thường", "Sói thường"];
 
         for (const roleName in allRolesData) {
+            // Chỉ render nếu roleName KHÔNG nằm trong danh sách defaultRoles
             if (defaultRoles.includes(roleName)) continue; 
             
             const role = allRolesData[roleName];
             
-            if (!role.Faction) continue; // Bỏ qua vai trò không hợp lệ
+            // Bộ lọc Faction vẫn quan trọng, phòng trường hợp sheet có rác
+            if (!role.Faction) continue; 
             
             const div = document.createElement('div');
             div.className = 'role-selection-item'; 
@@ -592,7 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const playerCount = parseInt(playerCountInRoom.textContent, 10) || 0;
         
-        // SỬA LỖI: Thêm kiểm tra
         const wolfRoleName = "Sói thường"; 
         if (allRolesData[wolfRoleName]) {
             selectedRoles.push(wolfRoleName);
@@ -622,6 +619,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+    
+    // *** KẾT THÚC SỬA LỖI LOGIC ***
 
     /**
      * Hàm chính điều khiển giao diện dựa trên phase
