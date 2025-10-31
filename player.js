@@ -26,6 +26,102 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let hasTriggeredLoop = false;
 
+    // --- 3. BIẾN DOM (Sẽ được gán trong initialize) ---
+    // *** BẮT ĐẦU SỬA LỖI: Di chuyển tất cả biến DOM vào hàm initialize ***
+    let lobbyContainer, lobbyPlayerName, createRoomBtn, createRoomOptions,
+        roomPrivateCheckbox, roomPasswordInput, confirmCreateRoomBtn, createRoomError,
+        roomList, joinPasswordSection, joinPasswordInput, confirmJoinRoomBtn, joinRoomError,
+        gameDashboard, playerNameDisplay, roomIdDisplay, hostNameDisplay,
+        hostControls, hostLobbyControls, hostStartGameBtn, roleSelectionGrid,
+        playerCountInRoom, roleCountSelected, hostGameplayControls, hostSkipPhaseBtn,
+        hostResetGameBtn, hostRestartGameBtn, hostEndGameBtn, hostDeleteRoomBtn,
+        playerListSection, playerCountDisplay, playerListIngame,
+        waitingSection, waitingTitle, waitingMessage, roleRevealSection,
+        roleRevealTimerContainer, votingUiSection, voteTitleDisplay,
+        voteTimerDisplay, voteOptionsContainer, voteStatusMessage,
+        phaseDisplaySection, phaseTitle, phaseTimerDisplay, phaseMessage, phaseResults,
+        privateLogSection, privateLogContent, interactiveActionSection,
+        playerControls, openWillModalBtn, rolesInGameDisplay,
+        chatSection, chatChannels, chatMessages, messageInput, sendMessageBtn,
+        roleDescriptionModal, willWritingModal, publishedWillModal, announcementModal;
+    
+    // Hàm trợ giúp gán DOM
+    const getEl = (id) => document.getElementById(id);
+    
+    // Hàm gán tất cả DOM
+    function assignDomElements() {
+        lobbyContainer = getEl('lobby-container');
+        lobbyPlayerName = getEl('lobby-player-name');
+        createRoomBtn = getEl('create-room-btn');
+        createRoomOptions = getEl('create-room-options');
+        roomPrivateCheckbox = getEl('room-private-checkbox');
+        roomPasswordInput = getEl('room-password-input');
+        confirmCreateRoomBtn = getEl('confirm-create-room-btn');
+        createRoomError = getEl('create-room-error');
+        roomList = getEl('room-list');
+        joinPasswordSection = getEl('join-password-section');
+        joinPasswordInput = getEl('join-password-input');
+        confirmJoinRoomBtn = getEl('confirm-join-room-btn');
+        joinRoomError = getEl('join-room-error');
+
+        gameDashboard = getEl('game-dashboard-container');
+        playerNameDisplay = getEl('player-name-display');
+        roomIdDisplay = getEl('room-id-display');
+        hostNameDisplay = getEl('host-name-display');
+
+        hostControls = getEl('host-controls');
+        hostLobbyControls = getEl('host-lobby-controls');
+        hostStartGameBtn = getEl('host-start-game-btn');
+        roleSelectionGrid = getEl('role-selection-grid');
+        playerCountInRoom = getEl('player-count-in-room');
+        roleCountSelected = getEl('role-count-selected');
+        hostGameplayControls = getEl('host-gameplay-controls');
+        hostSkipPhaseBtn = getEl('host-skip-phase-btn');
+        hostResetGameBtn = getEl('host-reset-game-btn');
+        hostRestartGameBtn = getEl('host-restart-game-btn');
+        hostEndGameBtn = getEl('host-end-game-btn');
+        hostDeleteRoomBtn = getEl('host-delete-room-btn');
+        
+        playerListSection = getEl('player-list-section');
+        playerCountDisplay = getEl('player-count-display');
+        playerListIngame = getEl('player-list-ingame');
+
+        waitingSection = getEl('waiting-section');
+        waitingTitle = getEl('waiting-title');
+        waitingMessage = getEl('waiting-message');
+        roleRevealSection = getEl('role-reveal-section');
+        roleRevealTimerContainer = getEl('role-reveal-timer-container');
+        votingUiSection = getEl('voting-ui-section');
+        voteTitleDisplay = getEl('vote-title-display');
+        voteTimerDisplay = getEl('vote-timer-display');
+        voteOptionsContainer = getEl('vote-options-container');
+        voteStatusMessage = getEl('vote-status-message');
+        phaseDisplaySection = getEl('phase-display-section');
+        phaseTitle = getEl('phase-title');
+        phaseTimerDisplay = getEl('phase-timer-display');
+        phaseMessage = getEl('phase-message');
+        phaseResults = getEl('phase-results');
+
+        privateLogSection = getEl('private-log-section');
+        privateLogContent = getEl('private-log-content');
+        interactiveActionSection = getEl('interactive-action-section');
+        playerControls = getEl('player-controls');
+        openWillModalBtn = getEl('open-will-modal-btn');
+        rolesInGameDisplay = getEl('roles-in-game-display');
+
+        chatSection = getEl('chat-section');
+        chatChannels = getEl('chat-channels');
+        chatMessages = getEl('chat-messages');
+        messageInput = getEl('message-input');
+        sendMessageBtn = getEl('send-message-btn');
+
+        roleDescriptionModal = getEl('role-description-modal');
+        willWritingModal = getEl('will-writing-modal');
+        publishedWillModal = getEl('published-will-modal');
+        announcementModal = getEl('announcement-modal');
+    }
+    // *** KẾT THÚC SỬA LỖI ***
+
 
     // --- 3. ÁNH XẠ KIND MỚI (Cho UI) ---
     const KIND_UI_MAP = {
@@ -41,88 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
         'freeze': { type: 'target', title: 'Đóng băng', description: 'Chọn một người để đóng băng chức năng và bảo vệ họ.' },
         'counteraudit': { type: 'passive', title: 'Nội tại: Phản soi' }
     };
-
-    // --- 4. DOM ELEMENTS (Lấy 1 lần) ---
-    const getEl = (id) => document.getElementById(id);
-
-    // *** BẮT ĐẦU SỬA LỖI: Cập nhật ID container chính ***
-    const lobbyContainer = getEl('lobby-container'); // Thay vì lobbySection
-    const lobbyPlayerName = getEl('lobby-player-name');
-    const createRoomBtn = getEl('create-room-btn');
-    const createRoomOptions = getEl('create-room-options');
-    const roomPrivateCheckbox = getEl('room-private-checkbox');
-    const roomPasswordInput = getEl('room-password-input');
-    const confirmCreateRoomBtn = getEl('confirm-create-room-btn');
-    const createRoomError = getEl('create-room-error');
-    const roomList = getEl('room-list');
-    const joinPasswordSection = getEl('join-password-section');
-    const joinPasswordInput = getEl('join-password-input');
-    const confirmJoinRoomBtn = getEl('confirm-join-room-btn');
-    const joinRoomError = getEl('join-room-error');
-
-    // Game Room
-    const gameDashboard = getEl('game-dashboard-container'); // Thay vì gameRoomSection
-    const playerNameDisplay = getEl('player-name-display');
-    const roomIdDisplay = getEl('room-id-display');
-    const hostNameDisplay = getEl('host-name-display');
-    // *** KẾT THÚC SỬA LỖI ***
-
-    // Host
-    const hostControls = getEl('host-controls');
-    const hostLobbyControls = getEl('host-lobby-controls');
-    const hostStartGameBtn = getEl('host-start-game-btn');
-    const roleSelectionGrid = getEl('role-selection-grid');
-    const playerCountInRoom = getEl('player-count-in-room');
-    const roleCountSelected = getEl('role-count-selected');
-    const hostGameplayControls = getEl('host-gameplay-controls');
-    const hostSkipPhaseBtn = getEl('host-skip-phase-btn');
-    const hostResetGameBtn = getEl('host-reset-game-btn');
-    const hostRestartGameBtn = getEl('host-restart-game-btn');
-    const hostEndGameBtn = getEl('host-end-game-btn');
-    const hostDeleteRoomBtn = getEl('host-delete-room-btn');
-    
-    // Player List
-    const playerListSection = getEl('player-list-section');
-    const playerCountDisplay = getEl('player-count-display');
-    const playerListIngame = getEl('player-list-ingame');
-
-    // Game State Cards
-    const waitingSection = getEl('waiting-section');
-    const waitingTitle = getEl('waiting-title');
-    const waitingMessage = getEl('waiting-message');
-    const roleRevealSection = getEl('role-reveal-section');
-    const roleRevealTimerContainer = getEl('role-reveal-timer-container');
-    const votingUiSection = getEl('voting-ui-section');
-    const voteTitleDisplay = getEl('vote-title-display');
-    const voteTimerDisplay = getEl('vote-timer-display');
-    const voteOptionsContainer = getEl('vote-options-container');
-    const voteStatusMessage = getEl('vote-status-message');
-    const phaseDisplaySection = getEl('phase-display-section');
-    const phaseTitle = getEl('phase-title');
-    const phaseTimerDisplay = getEl('phase-timer-display');
-    const phaseMessage = getEl('phase-message');
-    const phaseResults = getEl('phase-results');
-
-    // Action & Logs
-    const privateLogSection = getEl('private-log-section');
-    const privateLogContent = getEl('private-log-content');
-    const interactiveActionSection = getEl('interactive-action-section');
-    const playerControls = getEl('player-controls');
-    const openWillModalBtn = getEl('open-will-modal-btn');
-    const rolesInGameDisplay = getEl('roles-in-game-display');
-
-    // Chat
-    const chatSection = getEl('chat-section');
-    const chatChannels = getEl('chat-channels');
-    const chatMessages = getEl('chat-messages');
-    const messageInput = getEl('message-input');
-    const sendMessageBtn = getEl('send-message-btn');
-
-    // Modals
-    const roleDescriptionModal = getEl('role-description-modal');
-    const willWritingModal = getEl('will-writing-modal');
-    const publishedWillModal = getEl('published-will-modal');
-    const announcementModal = getEl('announcement-modal');
     
     let selectedRoomToJoin = null; // Biến tạm để lưu ID phòng khi nhập pass
 
@@ -171,16 +185,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // Dừng thực thi
         }
 
+        // *** BẮT ĐẦU SỬA LỖI: Gán DOM sau khi biết giao diện ***
+        // Gán tất cả các biến DOM ngay tại đây
+        assignDomElements();
+        // *** KẾT THÚC SỬA LỖI ***
+
         // Kiểm tra xem người chơi có đang ở trong phòng nào không
         currentRoomId = sessionStorage.getItem('mywolf_roomid');
         if (currentRoomId) {
             // Nếu có, thử vào thẳng phòng
-            showGameRoom(); // <-- Sửa lỗi: hàm này sẽ chạy đúng
+            showGameRoom(); 
             attachMainRoomListener(currentRoomId);
             attachChatListeners(currentRoomId);
         } else {
             // Nếu không, hiển thị sảnh chờ
-            showLobby(); // <-- Sửa lỗi: hàm này sẽ chạy đúng
+            showLobby(); 
         }
 
         // Gắn listener chung
@@ -191,7 +210,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị sảnh chờ và tải danh sách phòng
      */
     function showLobby() {
-        // *** SỬA LỖI: Dùng biến mới ***
         lobbyContainer.classList.remove('hidden');
         gameDashboard.classList.add('hidden');
         lobbyPlayerName.textContent = myUsername;
@@ -202,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị phòng game
      */
     function showGameRoom() {
-        // *** SỬA LỖI: Dùng biến mới ***
         lobbyContainer.classList.add('hidden');
         gameDashboard.classList.remove('hidden');
         playerNameDisplay.textContent = myUsername;
@@ -255,7 +272,10 @@ document.addEventListener('DOMContentLoaded', () => {
         hostRestartGameBtn.addEventListener('click', () => handleHostAction('restart-game'));
 
         // Xử lý chọn vai trò (Host)
-        roleSelectionGrid.addEventListener('change', updateRoleSelectionCount);
+        // Kiểm tra roleSelectionGrid có tồn tại không
+        if (roleSelectionGrid) {
+            roleSelectionGrid.addEventListener('change', updateRoleSelectionCount);
+        }
         
         // Listener cho thẻ bài
         roleRevealSection.addEventListener('click', (e) => {
@@ -513,7 +533,8 @@ document.addEventListener('DOMContentLoaded', () => {
             hostGameplayControls.classList.add('hidden');
             hostDeleteRoomBtn.classList.remove('hidden'); 
             
-            if (!roleSelectionGrid.hasChildNodes() && Object.keys(allRolesData).length > 0) {
+            // *** SỬA LỖI: Kiểm tra null trước khi truy cập hasChildNodes ***
+            if (roleSelectionGrid && !roleSelectionGrid.hasChildNodes() && Object.keys(allRolesData).length > 0) {
                 renderRoleSelection();
             }
             updateRoleSelectionCount(); 
@@ -544,24 +565,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // *** BẮT ĐẦU SỬA LỖI LOGIC ***
-    
     /**
      * Render các checkbox chọn vai trò cho Host
      */
     function renderRoleSelection() {
+        // *** SỬA LỖI: Kiểm tra roleSelectionGrid có null không ***
+        if (!roleSelectionGrid) {
+            console.error("Lỗi: Không tìm thấy 'role-selection-grid' trong DOM.");
+            return;
+        }
+        
         roleSelectionGrid.innerHTML = '';
         
-        // Đây là tên CHUỖI (STRING) của các vai trò mặc định
         const defaultRoles = ["Dân thường", "Sói thường"];
 
         for (const roleName in allRolesData) {
-            // Chỉ render nếu roleName KHÔNG nằm trong danh sách defaultRoles
             if (defaultRoles.includes(roleName)) continue; 
             
             const role = allRolesData[roleName];
             
-            // Bộ lọc Faction vẫn quan trọng, phòng trường hợp sheet có rác
             if (!role.Faction) continue; 
             
             const div = document.createElement('div');
@@ -582,6 +604,9 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function updateRoleSelectionCount() {
         if (!isHost) return;
+
+        // *** SỬA LỖI: Kiểm tra roleSelectionGrid có null không ***
+        if (!roleSelectionGrid) return; 
 
         const selectedRoles = [];
         roleSelectionGrid.querySelectorAll('.role-select-cb:checked').forEach(cb => {
@@ -610,7 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         roleCountSelected.textContent = selectedRoles.length;
         
-        // Chỉ cập nhật nếu phòng còn tồn tại
         if (currentRoomId) {
             database.ref(`rooms/${currentRoomId}/gameSettings`).set({
                 roles: selectedRoles
@@ -619,8 +643,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-    
-    // *** KẾT THÚC SỬA LỖI LOGIC ***
 
     /**
      * Hàm chính điều khiển giao diện dựa trên phase
