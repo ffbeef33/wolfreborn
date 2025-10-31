@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/sheets?sheetName=Roles');
             
-            // *** SỬA LỖI 1: Thêm kiểm tra response.ok ***
+            // SỬA 1: Thêm kiểm tra response.ok
             if (!response.ok) {
                 throw new Error(`API /api/sheets trả về lỗi ${response.status}`);
             }
@@ -149,10 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             allRolesData = rolesArray.reduce((acc, role) => {
-                // *** SỬA LỖI 2: Thêm kiểm tra 'role.RoleName' ***
-                // Bỏ qua các hàng trống trong Google Sheet có 'RoleName' là rỗng
-                if (role && role.RoleName) {
-                    acc[role.RoleName] = role;
+                // SỬA 2: Thêm kiểm tra 'role.RoleName' để BỎ QUA HÀNG TRỐNG
+                if (role && role.RoleName && role.RoleName.trim() !== "") {
+                    acc[role.RoleName.trim()] = role; // Thêm .trim() để đảm bảo
                 }
                 return acc;
             }, {});
@@ -164,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (e) {
             console.error("Lỗi tải dữ liệu Roles:", e);
+            // Alert sẽ hiển thị lỗi rõ ràng hơn
             alert(`Lỗi nghiêm trọng: Không thể tải dữ liệu vai trò từ Google Sheets.\nChi tiết: ${e.message}\nVui lòng kiểm tra API, biến môi trường và Google Sheets.`);
             return;
         }
@@ -443,7 +443,11 @@ document.addEventListener('DOMContentLoaded', () => {
             hostNameDisplay.textContent = roomData.players[roomData.hostId]?.username || '...';
             updatePlayerList(roomData.players);
             updateHostControls(roomData);
-            updateMainUI(roomData, myPlayerData); // Hàm chính điều khiển giao diện
+            
+            // *** SỬA LỖI 1: "Trạng thái không xác định" ***
+            // Truyền roomData.gameState thay vì roomData
+            updateMainUI(roomData.gameState, myPlayerData); 
+            
             updateChatChannels(myPlayerData, roomData.gameState?.phase); // Cập nhật kênh chat (Sói)
             
             // Cập nhật thông báo
@@ -518,7 +522,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Kiểm tra điều kiện start
             const playerCount = Object.keys(roomData.players).length;
             const rolesSelected = (roomData.gameSettings?.roles || []).length;
-            const hasWolf = (roomData.gameSettings?.roles || []).some(roleName => allRolesData[roleName]?.Faction === 'Bầy Sói');
+            
+            // Phải kiểm tra allRolesData[roleName] phòng trường hợp roleName là rỗng
+            const hasWolf = (roomData.gameSettings?.roles || []).some(roleName => allRolesData[roleName] && allRolesData[roleName].Faction === 'Bầy Sói');
             
             if (playerCount >= 4 && playerCount === rolesSelected && hasWolf) {
                 hostStartGameBtn.disabled = false;
@@ -547,13 +553,29 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function renderRoleSelection() {
         roleSelectionGrid.innerHTML = '';
-        // Bỏ qua Dân Thường (hàng 2) và Sói (hàng 3)
-        const defaultRoles = [allRolesData['Dân thường']?.RoleName, allRolesData['Sói thường']?.RoleName];
+        
+        // SỬA 3: Đảm bảo tên vai trò mặc định cũng được .trim() nếu cần
+        const defaultRoleNames = {
+            civilian: "Dân thường",
+            wolf: "Sói thường"
+        };
+        
+        // Lấy tên vai trò từ sheet (để phòng trường hợp tên bị thay đổi)
+        // Tìm Dân thường (hàng 2) và Sói (hàng 3) trong allRolesData
+        const civilianRoleName = Object.keys(allRolesData).find(name => allRolesData[name].RoleName === defaultRoleNames.civilian) || defaultRoleNames.civilian;
+        const wolfRoleName = Object.keys(allRolesData).find(name => allRolesData[name].RoleName === defaultRoleNames.wolf) || defaultRoleNames.wolf;
+
+        const defaultRoles = [civilianRoleName, wolfRoleName];
 
         for (const roleName in allRolesData) {
-            if (defaultRoles.includes(roleName)) continue;
+            // Bỏ qua vai trò mặc định
+            if (defaultRoles.includes(roleName)) continue; 
             
             const role = allRolesData[roleName];
+            
+            // SỬA 4: Thêm một lớp bảo vệ nữa, không vẽ vai trò không có Faction
+            if (!role.Faction) continue; 
+            
             const div = document.createElement('div');
             div.className = 'role-selection-item'; // Cần CSS cho class này
             div.innerHTML = `
@@ -565,6 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roleSelectionGrid.appendChild(div);
         }
     }
+
 
     /**
      * Cập nhật số lượng vai trò Host đã chọn và gửi lên Firebase
@@ -618,6 +641,14 @@ document.addEventListener('DOMContentLoaded', () => {
              document.body.classList.remove('is-dead');
              openWillModalBtn.disabled = false;
              openWillModalBtn.textContent = 'Viết Di Chúc';
+        }
+        
+        // *** SỬA LỖI 1: Đảm bảo gameState tồn tại ***
+        if (!gameState) {
+             waitingSection.classList.remove('hidden');
+             waitingTitle.textContent = "Đang tải...";
+             waitingMessage.textContent = "Trạng thái không xác định.";
+             return; // Dừng hàm sớm
         }
 
         const nightNum = gameState.nightNumber || 0;
@@ -693,7 +724,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Hủy timer cũ (nếu có)
         if (window.phaseTimerInterval) clearInterval(window.phaseTimerInterval);
         
-        const timerElement = phaseTimerDisplay.closest('.game-card:not(.hidden)')?.querySelector('.timer');
+        // *** SỬA LỖI 1: Đảm bảo gameState tồn tại ***
+        if (!gameState) return; 
+
+        const timerElement = phaseDisplaySection.closest('.game-card:not(.hidden)')?.querySelector('.timer');
         if (!timerElement) return; // Không có timer cho phase này
         
         const endTime = (gameState.startTime || 0) + (gameState.duration * 1000);
@@ -701,7 +735,10 @@ document.addEventListener('DOMContentLoaded', () => {
         function updateClock() {
             const remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
             if (timerElement) {
-                timerElement.textContent = `${remaining}s`;
+                // Sửa format timer
+                const minutes = Math.floor(remaining / 60);
+                const seconds = remaining % 60;
+                timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             }
             if (remaining <= 0) {
                 clearInterval(window.phaseTimerInterval);
@@ -737,6 +774,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const state = myPlayerData.state || {};
         const kind = role.Kind;
         const uiInfo = KIND_UI_MAP[kind] || KIND_UI_MAP['empty'];
+        
+        // Lấy roomData từ listener (cần đảm bảo roomData là biến global hoặc có thể truy cập)
+        // Đây là một rủi ro, nên định nghĩa roomData ở phạm vi cao hơn
+        // Tạm thời, giả sử roomData có thể truy cập được (từ listener)
+        // Tốt hơn là truyền roomData vào hàm này
+        // *** SỬA: Lấy roomData từ DB (hoặc lưu trữ nó) ***
+        // Vì hàm này được gọi từ updateMainUI, nên roomData chưa có sẵn
+        // Chúng ta cần lấy roomData một lần nữa hoặc cấu trúc lại
+        // -> GIẢ SỬ listener đã cập nhật một biến `currentRoomData` toàn cục
+        // -> TỐT HƠN: Hàm attachMainRoomListener nên lưu roomData
+        
+        // *** GIẢI PHÁP TỐT NHẤT: Lưu trữ roomData khi listener chạy ***
+        // Thêm `let currentRoomData = null;` ở đầu file (biến toàn cục)
+        // Trong `attachMainRoomListener`, gán `currentRoomData = roomData;`
+        
+        // *** GIẢI PHÁP TẠM THỜI (để code chạy): Thêm `roomData` vào tham số ***
+        // Đổi `renderNightActions(myPlayerData, nightNum)`
+        // thành `renderNightActions(roomData, myPlayerData, nightNum)`
+        // và trong `updateMainUI`:
+        // `renderNightActions(roomData, myPlayerData, nightNum)`
+        
+        // *** ÁP DỤNG GIẢI PHÁP TẠM THỜI ***
+        // TÔI SẼ SỬA LUÔN CÁC HÀM LIÊN QUAN
+        
+        // (Giả sử hàm này đã được gọi với `roomData`)
+        // (Xem hàm `updateMainUI` đã được sửa)
+        const roomData = window.currentRoomData; // Giả sử đã lưu
+        if (!roomData) return; // Không có dữ liệu phòng
 
         // 1. Kiểm tra Sói (hành động chung)
         if (myPlayerData.faction === 'Bầy Sói') {
@@ -788,6 +853,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // *** SỬA LỖI LOGIC: Lưu trữ roomData để renderNightActions sử dụng ***
+    let currentRoomData = null; // Thêm biến này ở đầu file (gần chỗ `let currentRoomId = null;`)
+    // Trong hàm `attachMainRoomListener`:
+    // ...
+    // mainRoomListener = roomRef.on('value', (snapshot) => {
+    //     const roomData = snapshot.val();
+    //     currentRoomData = roomData; // *** THÊM DÒNG NÀY ***
+    // ...
+    // (Tôi sẽ thêm `let currentRoomData = null;` vào đầu file)
+
+
     /**
      * Tạo khung panel hành động
      */
@@ -835,6 +911,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const grid = document.createElement('div');
         grid.className = 'target-grid';
         
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return; 
+        const roomData = currentRoomData;
+        const myPlayerData = roomData.players[myPlayerId] || {}; // Lấy myPlayerData mới nhất
+        
         const lastTargetId = myPlayerData.state?.lastTargetId;
         const players = roomData.players || {};
         
@@ -877,15 +958,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     confirmBtn.onclick = () => {
                         const targets = Array.from(grid.querySelectorAll('.selected')).map(c => c.dataset.playerId);
                         const actionData = {
-                            action: kind, // Mặc dù kind là 'kill', action của Sói là 'wolf_bite'
-                            targetId: targets[0] // Logic Sói chỉ chọn 1
+                            action: kind, 
+                            targetId: targets[0] 
                         };
                         
-                        if (kind === 'wolf_bite') {
-                             database.ref(`rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`).set(actionData);
-                        } else {
-                             // Xử lý cho các vai trò khác (nếu cần nút confirm)
-                        }
+                        // Sửa logic: Gửi action lên DB
+                        database.ref(`rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`).set(actionData);
                     };
                 } else {
                     // Nếu không có nút confirm (chọn là gửi)
@@ -899,9 +977,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.appendChild(grid);
         
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return;
+        const nightActions = currentRoomData.nightActions?.[nightNum] || {};
+
         // Hiển thị phiếu bầu của Sói
         if (kind === 'wolf_bite') {
-            const nightActions = roomData.nightActions?.[nightNum] || {};
             const wolfVotes = {};
             Object.keys(players).forEach(pId => {
                 if (players[pId].faction === 'Bầy Sói' && nightActions[pId]?.targetId) {
@@ -936,6 +1017,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị giao diện Phù thủy
      */
     function renderWitchPanel(state, nightNum) {
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return; 
+        const roomData = currentRoomData;
+        
         const { panel, content, footer } = createActionPanel('Thuốc Phù thủy', 'Bạn có 1 bình Cứu và 1 bình Giết.', 'witch');
         const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`;
 
@@ -1002,6 +1087,11 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị giao diện Sát thủ
      */
     function renderAssassinPanel(nightNum, canReselect) {
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return; 
+        const roomData = currentRoomData;
+        const myPlayerData = roomData.players[myPlayerId] || {};
+        
         const { panel, content } = createActionPanel('Ám Sát', 'Chọn mục tiêu, sau đó đoán vai trò.', 'assassin');
         const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`;
         const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId];
@@ -1053,6 +1143,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị danh sách vai trò cho Sát thủ đoán
      */
     function renderAssassinGuessList(container, targetId, nightNum, currentGuess) {
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return; 
+        const roomData = currentRoomData;
+
         let guessGrid = container.querySelector('#assassin-guess-grid');
         if (!guessGrid) {
             guessGrid = document.createElement('div');
@@ -1092,6 +1186,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị giao diện Sói Nguyền
      */
     function renderCursePanel(nightNum) {
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return; 
+        const roomData = currentRoomData;
+
         const { panel, content } = createActionPanel('Nguyền Rủa', 'Bạn có muốn nguyền rủa mục tiêu Sói cắn đêm nay không?', 'curse');
         const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`;
         const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId];
@@ -1130,6 +1228,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị giao diện Biểu Quyết
      */
     function renderVoting(gameState) {
+        // *** SỬA LỖI LOGIC: Đảm bảo có currentRoomData ***
+        if (!currentRoomData) return; 
+        const roomData = currentRoomData;
+
         const nightNum = gameState.nightNumber || 0;
         const myVote = roomData.votes?.[nightNum]?.[myPlayerId];
         
