@@ -1,6 +1,5 @@
 // File: /api/game-engine.js
 // Đây là THƯ VIỆN LOGIC GAME, chạy trên backend (Node.js).
-// Nó KHÔNG phải là một endpoint API, mà chỉ export các hàm.
 
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
@@ -23,21 +22,22 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 phút
  * Khởi tạo và trả về Firebase Admin App (chỉ một lần).
  */
 function getFirebaseAdmin() {
-    if (!firebaseAdminApp) {
-        if (getApps().length > 0) {
-            firebaseAdminApp = getApps()[0];
-        } else {
-            try {
-                const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-                const databaseURL = process.env.FIREBASE_DATABASE_URL;
-                firebaseAdminApp = initializeApp({
-                    credential: cert(serviceAccount),
-                    databaseURL: databaseURL,
-                });
-            } catch (e) {
-                console.error("Lỗi Khởi Tạo Firebase Admin SDK:", e);
-                throw new Error("Không thể khởi tạo Firebase Admin SDK.");
-            }
+    // Đặt tên riêng cho instance này để tránh xung đột
+    const APP_NAME = 'firebaseAdminGameEngine';
+    
+    if (getApps().find(app => app.name === APP_NAME)) {
+        firebaseAdminApp = getApps().find(app => app.name === APP_NAME);
+    } else {
+        try {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            const databaseURL = process.env.FIREBASE_DATABASE_URL;
+            firebaseAdminApp = initializeApp({
+                credential: cert(serviceAccount),
+                databaseURL: databaseURL,
+            }, APP_NAME); // Đặt tên riêng
+        } catch (e) {
+            console.error("Lỗi Khởi Tạo Firebase Admin SDK (game-engine):", e);
+            throw new Error("Không thể khởi tạo Firebase Admin SDK.");
         }
     }
     return firebaseAdminApp;
@@ -67,9 +67,9 @@ async function getGoogleSheetsAPI() {
 
 /**
  * Đọc và cache dữ liệu từ Google Sheet.
- * @param {string} sheetName Tên sheet (Roles, Mechanic)
+ * (ĐÃ THÊM 'export' ĐỂ host-actions.js CÓ THỂ SỬ DỤNG)
  */
-async function fetchSheetData(sheetName) {
+export async function fetchSheetData(sheetName) {
     const now = Date.now();
     // Kiểm tra cache
     if (sheetName === 'Roles' && rolesDataCache && (now - cacheTimestamp < CACHE_DURATION)) {
@@ -343,7 +343,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     // --- Ưu tiên 1: Bảo vệ, Khóa, & Phản Soi (Freeze, Shield, Counteraudit) ---
     livingPlayerIds.forEach(pId => {
         const status = liveStatus[pId];
-        if (!isActionActive(status, currentNightNumber)) return;
+        const player = players[pId]; // Lấy thông tin player gốc
+        if (!isActionActive(status, player.state, currentNightNumber)) return;
         
         const action = status.action;
         const targetId = action.targetId;
@@ -364,7 +365,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     // --- Ưu tiên 2: Soi (Audit) ---
     livingPlayerIds.forEach(pId => {
         const status = liveStatus[pId];
-        if (!isActionActive(status, currentNightNumber)) return; // Soi vẫn hoạt động khi bị 'freeze' nhưng trả KQ sai
+        const player = players[pId];
+        if (!isActionActive(status, player.state, currentNightNumber)) return; // Soi vẫn hoạt động khi bị 'freeze' nhưng trả KQ sai
         
         const action = status.action;
         const targetId = action.targetId;
@@ -390,7 +392,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     // --- Ưu tiên 3: Gây sát thương & Nguyền (Kill, Killwolf, Assassin, Curse) ---
     livingPlayerIds.forEach(pId => {
         const status = liveStatus[pId];
-        if (!isActionActive(status, currentNightNumber) || status.isDisabled) return;
+        const player = players[pId];
+        if (!isActionActive(status, player.state, currentNightNumber) || status.isDisabled) return;
 
         const action = status.action;
         const targetId = action.targetId;
@@ -443,11 +446,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     // --- Ưu tiên 5: Cứu (Witch Save) ---
     livingPlayerIds.forEach(pId => {
         const status = liveStatus[pId];
+        const player = players[pId];
         if (status.isDisabled) return; // Witch bị 'freeze' không thể dùng thuốc
         if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'save') return;
         
         // Phù thủy chỉ dùng thuốc Cứu 1 lần
         if (status.state.witch_save_used) return;
+        // Kiểm tra ReSelect
+        if (!isActionActive(status, player.state, currentNightNumber)) return; 
 
         const targetId = status.action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
@@ -468,11 +474,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     // --- Ưu tiên 6: Giết (Witch Kill) ---
     livingPlayerIds.forEach(pId => {
         const status = liveStatus[pId];
+        const player = players[pId];
         if (status.isDisabled) return;
         if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'kill') return;
 
         // Phù thủy chỉ dùng thuốc Giết 1 lần
         if (status.state.witch_kill_used) return;
+        // Kiểm tra ReSelect
+        if (!isActionActive(status, player.state, currentNightNumber)) return;
 
         const targetId = status.action.targetId;
         if (liveStatus[targetId]) {
@@ -502,7 +511,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.state.witch_kill_used) newState.witch_kill_used = true;
 
         // Cập nhật số lần dùng (Active)
-        if (status.action && isActionActive(status, currentNightNumber, false)) { // false = ko check reselect
+        if (status.action && isActionActive(status, player.state, currentNightNumber, false)) { // false = ko check reselect
             const activeRule = status.role.Active;
             if (activeRule !== 'n' && activeRule !== '0') {
                 const activeLeft = (parseInt(newState.activeLeft ?? activeRule)) - 1;
@@ -568,9 +577,9 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 /**
  * Helper function: Kiểm tra xem hành động có được kích hoạt không
  */
-function isActionActive(status, currentNightNumber, checkReSelect = true) {
+function isActionActive(status, playerState, currentNightNumber, checkReSelect = true) {
     const role = status.role;
-    const state = status.state;
+    const state = playerState; // Dùng state gốc từ DB
     const action = status.action;
 
     // Không có hành động
@@ -588,10 +597,9 @@ function isActionActive(status, currentNightNumber, checkReSelect = true) {
         if (activeLeft <= 0) return false; // Hết lần dùng
     }
   
-    // 3. Check ReSelect (nếu Host bật)
+    // 3. Check ReSelect
     if (checkReSelect) {
-        // const reselectDisabled = roomData.gameSettings.reselectDisabled; // Lấy từ cài đặt phòng
-        const reselectDisabled = (role.ReSelect === '0'); // Mặc định là theo role
+        const reselectDisabled = (role.ReSelect === '0');
         if (reselectDisabled) {
            if (state.lastTargetId === action.targetId) {
                return false; // Không được chọn lại
@@ -761,10 +769,7 @@ async function checkWinCondition(roomId) {
         return { isEnd: true, winner: "Bầy Sói" };
     }
     
-    // (Thêm logic thắng cho Phe thứ ba nếu cần, ví dụ: 
-    // if (thirdPartyCount > 0 && wolfCount === 0 && villagerCount === 0) {
-    //    return { isEnd: true, winner: "Phe thứ ba" };
-    // })
+    // (Thêm logic thắng cho Phe thứ ba nếu cần)
 
     return { isEnd: false, winner: null };
 }
