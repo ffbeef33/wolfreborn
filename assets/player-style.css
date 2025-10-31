@@ -355,7 +355,6 @@ button.btn-danger:hover:not(:disabled) {
 .card-inner {
     position: relative;
     width: 100%;
-    /* *** THAY ĐỔI: Chiều cao nhỏ hơn nhiều *** */
     height: 320px; 
     transition: transform 0.8s;
     transform-style: preserve-3d;
@@ -409,7 +408,8 @@ button.btn-danger:hover:not(:disabled) {
 #role-reveal-timer-container {
     text-align: center;
     font-size: 1.1rem;
-    margin: -5px 0 15px 0;
+    /* *** SỬA LỖI: Bỏ margin-top âm để không bị che *** */
+    margin: 10px 0 15px 0;
     color: var(--light-text);
 }
 
