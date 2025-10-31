@@ -22,13 +22,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let chatListeners = {}; // Listeners cho các kênh chat
     let activeChatChannel = 'living'; // Kênh chat mặc định
     
-    // *** SỬA LỖI LOGIC: Thêm biến lưu trữ roomData toàn cục ***
-    // Để các hàm render (như renderNightActions) có thể truy cập
     let currentRoomData = null;
+    
+    // *** SỬA LỖI 2 (Hết lag): Thêm cờ để ngăn trigger loop nhiều lần ***
+    let hasTriggeredLoop = false;
 
 
     // --- 3. ÁNH XẠ KIND MỚI (Cho UI) ---
-    // Dùng để render giao diện hành động đêm
     const KIND_UI_MAP = {
         'empty': { type: 'passive', title: 'Nghỉ ngơi' },
         'shield': { type: 'target', title: 'Bảo vệ', description: 'Chọn một người để bảo vệ đêm nay.' },
@@ -141,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/sheets?sheetName=Roles');
             
-            // SỬA 1: Thêm kiểm tra response.ok
             if (!response.ok) {
                 const errText = await response.text();
                 throw new Error(`API /api/sheets trả về lỗi ${response.status}. Chi tiết: ${errText}`);
@@ -149,13 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const rolesArray = await response.json();
             
-            // SỬA 2: Kiểm tra kỹ hơn
             if (!rolesArray || !Array.isArray(rolesArray)) {
                  throw new Error("API /api/sheets không trả về dữ liệu mảng (array).");
             }
 
-            // (Lọc hàng trống đã được chuyển sang api/sheets.js,
-            // nhưng chúng ta vẫn lọc ở đây để đảm bảo an toàn)
             allRolesData = rolesArray.reduce((acc, role) => {
                 if (role && role.RoleName && role.RoleName.trim() !== "") {
                     acc[role.RoleName.trim()] = role; 
@@ -259,7 +255,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Listener cho thẻ bài
         roleRevealSection.addEventListener('click', () => {
-             roleRevealSection.classList.toggle('is-flipped');
+             // Chỉ cho phép lật nếu đang ở phase DAY_1_INTRO
+             if (currentRoomData?.gameState?.phase === 'DAY_1_INTRO') {
+                roleRevealSection.classList.toggle('is-flipped');
+             }
         });
     }
     
@@ -420,7 +419,6 @@ document.addEventListener('DOMContentLoaded', () => {
         mainRoomListener = roomRef.on('value', (snapshot) => {
             const roomData = snapshot.val();
             
-            // *** SỬA LỖI LOGIC: Lưu roomData để các hàm khác dùng ***
             currentRoomData = roomData; 
             
             if (!roomData) {
@@ -449,7 +447,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerList(roomData.players);
             updateHostControls(roomData);
             
-            // *** SỬA LỖI 1: "Trạng thái không xác định" ***
             updateMainUI(roomData.gameState, myPlayerData); 
             
             updateChatChannels(myPlayerData, roomData.gameState?.phase); 
@@ -514,7 +511,6 @@ document.addEventListener('DOMContentLoaded', () => {
             hostGameplayControls.classList.add('hidden');
             hostDeleteRoomBtn.classList.remove('hidden'); 
             
-            // Render danh sách vai trò (chỉ 1 lần)
             if (!roleSelectionGrid.hasChildNodes() && Object.keys(allRolesData).length > 0) {
                 renderRoleSelection();
             }
@@ -623,11 +619,16 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hàm chính điều khiển giao diện dựa trên phase
      */
     function updateMainUI(gameState, myPlayerData) {
-        // Ẩn tất cả các card trạng thái
-        [waitingSection, roleRevealSection, votingUiSection, phaseDisplaySection, interactiveActionSection].forEach(el => el.classList.add('hidden'));
-        // Ẩn thẻ bài lật
-        roleRevealSection.classList.remove('is-flipped');
+        // *** BẮT ĐẦU SỬA LỖI 1, 2 & 3 ***
+        
+        // 1. Ẩn các card trạng thái chính (trừ Role Card)
+        [waitingSection, votingUiSection, phaseDisplaySection, interactiveActionSection].forEach(el => el.classList.add('hidden'));
 
+        // 2. Reset cờ trigger loop (Sửa Lỗi 2)
+        hasTriggeredLoop = false;
+        
+        // *** KẾT THÚC SỬA LỖI ***
+        
         if (!myPlayerData) {
              console.error("Không tìm thấy myPlayerData!");
              return;
@@ -645,6 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (!gameState) {
+             roleRevealSection.classList.add('hidden'); // Ẩn role card nếu gameState null
              waitingSection.classList.remove('hidden');
              waitingTitle.textContent = "Đang tải...";
              waitingMessage.textContent = "Trạng thái không xác định (gameState null).";
@@ -652,6 +654,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const nightNum = gameState.nightNumber || 0;
+        
+        // *** SỬA LỖI 3 (Persistent Card): Xử lý hiển thị Role Card ***
+        if (gameState.phase === 'waiting') {
+            roleRevealSection.classList.add('hidden'); // Ẩn khi chờ
+            roleRevealSection.classList.remove('is-flipped'); // Lật úp lại
+        } else {
+            roleRevealSection.classList.remove('hidden'); // Hiển thị trong tất cả các phase khác
+        }
+        // *** KẾT THÚC SỬA LỖI 3 ***
+
 
         switch (gameState.phase) {
             case 'waiting':
@@ -661,16 +673,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             
             case 'DAY_1_INTRO':
-                roleRevealSection.classList.remove('hidden');
+                // *** SỬA LỖI 1 (Timer Lật Bài): Tự động lật thẻ bài ***
+                roleRevealSection.classList.add('is-flipped'); 
+                
                 if (myPlayerData.roleName) {
                     renderRoleCard(myPlayerData.roleName, myPlayerData.faction);
                 } else {
-                    // Xử lý trường hợp roleName chưa kịp về
-                     renderRoleCard("?", "Đang chờ");
+                    renderRoleCard("?", "Đang chờ");
                 }
                 break;
 
             case 'NIGHT':
+                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
                 if (myPlayerData.isAlive) {
                     interactiveActionSection.classList.remove('hidden');
                     renderNightActions(myPlayerData, nightNum);
@@ -684,15 +698,16 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'DAY_RESULT':
             case 'VOTE_RESULT':
             case 'GAME_END':
+                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
                 phaseDisplaySection.classList.remove('hidden');
                 phaseTitle.textContent = "Kết Quả";
                 if (gameState.phase === 'GAME_END') {
                     phaseTitle.textContent = "KẾT THÚC GAME";
                 }
-                // Thông báo sẽ được hiển thị qua listener 'latestAnnouncement'
                 break;
 
             case 'DAY_DISCUSS':
+                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
                 phaseDisplaySection.classList.remove('hidden');
                 phaseTitle.textContent = `Ngày ${nightNum}`;
                 phaseMessage.textContent = "Thảo luận để tìm ra Sói!";
@@ -700,6 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'VOTE':
+                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
                 if (myPlayerData.isAlive) {
                     votingUiSection.classList.remove('hidden');
                     renderVoting(gameState);
@@ -729,20 +745,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Tìm timer trong card đang hiển thị
         let visibleTimerDisplay = null;
         if (!waitingSection.classList.contains('hidden')) {
-            visibleTimerDisplay = null; // Không có timer ở waiting
+            visibleTimerDisplay = null; 
         } else if (!votingUiSection.classList.contains('hidden')) {
             visibleTimerDisplay = voteTimerDisplay;
         } else if (!phaseDisplaySection.classList.contains('hidden')) {
             visibleTimerDisplay = phaseTimerDisplay;
-        } else if (!roleRevealSection.classList.contains('hidden')) {
-            // *** SỬA LỖI 1: Thêm timer cho Role Reveal ***
+        } else if (!roleRevealSection.classList.contains('hidden') && gameState.phase === 'DAY_1_INTRO') {
+            // *** SỬA LỖI 1: Chỉ lấy timer này khi nó đang ở phase INTRO ***
             visibleTimerDisplay = getEl('role-reveal-timer-display');
-        
-        // *** SỬA LỖI 2: Thêm timer cho Night Phase (Hành động đêm) ***
         } else if (!interactiveActionSection.classList.contains('hidden')) {
             visibleTimerDisplay = getEl('night-phase-timer-display');
         }
         
+        // Nếu không tìm thấy timer (ví dụ: thẻ role đang hiển thị nhưng ở phase NIGHT)
+        // thì không cần chạy đồng hồ
         if (!visibleTimerDisplay) return;
         
         const endTime = (gameState.startTime || 0) + (gameState.duration * 1000);
@@ -757,6 +773,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (remaining <= 0) {
                 clearInterval(window.phaseTimerInterval);
                 if (visibleTimerDisplay) visibleTimerDisplay.textContent = "0:00";
+                
+                // *** BẮT ĐẦU SỬA LỖI 2 (Hết lag) ***
+                // Chỉ trigger 1 lần, và không trigger khi đang chờ
+                if (!hasTriggeredLoop && currentRoomId && gameState.phase !== 'waiting' && gameState.phase !== 'GAME_END') {
+                    hasTriggeredLoop = true; // Đánh dấu đã trigger
+                    console.log("Timer hit 0. Triggering game loop...");
+                    
+                    // Gọi API mới
+                    fetch('/api/trigger-loop', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ roomId: currentRoomId })
+                    }).catch(err => {
+                        console.error("Lỗi khi trigger loop:", err);
+                        hasTriggeredLoop = false; // Cho phép thử lại nếu lỗi
+                    });
+                }
+                // *** KẾT THÚC SỬA LỖI 2 ***
             }
         }
         updateClock();
@@ -785,16 +819,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderNightActions(myPlayerData, nightNum) {
         interactiveActionSection.innerHTML = ''; 
         
-        // *** SỬA LỖI 2: Thêm Timer cho Phase Đêm ***
-        // Tạo và thêm bảng timer vào đầu
         const timerEl = document.createElement('div');
-        timerEl.className = 'night-timer-display'; // Class này đã có trong player-style.css
+        timerEl.className = 'night-timer-display'; 
         timerEl.innerHTML = `
             <h2>Đêm ${nightNum}</h2>
             <p class="timer">Thời gian còn lại: <strong id="night-phase-timer-display">--</strong></p>
         `;
         interactiveActionSection.appendChild(timerEl);
-        // *** KẾT THÚC SỬA LỖI 2 ***
 
         if (!currentRoomData) {
              console.error("renderNightActions: currentRoomData bị null");
@@ -813,27 +844,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Chọn một mục tiêu để cả bầy cùng cắn.',
                 'wolf_bite'
             );
-            // Sói không thể tự cắn
             renderTargetList(panel.content, 'wolf_bite', nightNum, 1, true, (pId) => pId !== myPlayerId); 
             interactiveActionSection.appendChild(panel.panel);
         }
 
         // 2. Kiểm tra chức năng (Active)
         const nightRule = parseInt(role.Night);
-        // "Nếu Active = 0"
         if (role.Active === '0') {
              if (myPlayerData.faction !== 'Bầy Sói') renderRestingPanel();
              return;
         }
-        // "Hoặc (Night khác 'n' VÀ Night > đêm hiện tại)"
         if (role.Night !== 'n' && nightRule > nightNum) {
             if (myPlayerData.faction !== 'Bầy Sói') renderRestingPanel();
-            return; // Không có chức năng hoặc chưa đến đêm
+            return; 
         }
-        // "Hoặc (Active khác 'n' VÀ số lần dùng còn lại <= 0)"
         if (role.Active !== 'n' && (state.activeLeft ?? parseInt(role.Active)) <= 0) {
             if (myPlayerData.faction !== 'Bầy Sói') renderRestingPanel();
-            return; // Hết lần dùng
+            return; 
         }
 
 
@@ -843,11 +870,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (myPlayerData.faction !== 'Bầy Sói') renderRestingPanel();
                 break;
             
-            case 'target': // (shield, kill, audit, killwolf, freeze)
+            case 'target': 
                 const panel = createActionPanel(uiInfo.title, uiInfo.description, kind);
                 const reselect = role.ReSelect === '1';
                 const quantity = role.Quantity === 'n' ? 99 : parseInt(role.Quantity);
-                // Mặc định là không thể tự target
                 renderTargetList(panel.content, kind, nightNum, quantity, reselect, (pId) => pId !== myPlayerId);
                 interactiveActionSection.appendChild(panel.panel);
                 break;
@@ -895,7 +921,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị bảng nghỉ ngơi
      */
     function renderRestingPanel() {
-        // *** SỬA LỖI: Thay vì ghi đè innerHTML, hãy tạo và nối thêm element ***
         const restingPanel = document.createElement('div');
         restingPanel.className = 'night-action-panel resting-panel';
         restingPanel.innerHTML = `
@@ -924,7 +949,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         Object.keys(players).forEach(pId => {
             if (!players[pId].isAlive) return; 
-            // Áp dụng filter (ví dụ: không tự target)
             if (filterFunc && !filterFunc(pId)) return; 
 
             const card = document.createElement('div');
@@ -953,20 +977,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Logic gửi action: (Loại bỏ nút 'Confirm' cho đơn giản)
-                // Lấy tất cả target đã chọn
                 const targets = Array.from(grid.querySelectorAll('.selected')).map(c => c.dataset.playerId);
                 
-                // (Gửi action lên DB)
-                // Sói cắn và các vai trò khác (shield, audit...) đều dùng targetId
                 const actionData = { 
                     action: kind, 
-                    // Sói (wolf_bite) chỉ nên gửi 1 target
                     targetId: (kind === 'wolf_bite' || quantity === 1) ? targets[0] : targets
-                    // (Nếu cần hỗ trợ multi-target, logic backend/frontend cần phức tạp hơn)
                 };
                 
-                // Nếu không chọn ai (bỏ chọn), gửi targetId là null
                 if (targets.length === 0) {
                      actionData.targetId = null;
                 }
@@ -980,7 +997,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const nightActions = currentRoomData.nightActions?.[nightNum] || {};
 
-        // Hiển thị phiếu bầu của Sói
         if (kind === 'wolf_bite') {
             const wolfVotes = {};
             Object.keys(players).forEach(pId => {
@@ -1003,10 +1019,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         } else {
-             // Đánh dấu lựa chọn của bản thân cho các vai trò khác
              if (nightActions[myPlayerId]?.action === kind) {
                 const myTarget = nightActions[myPlayerId].targetId;
-                // (Cần xử lý nếu myTarget là mảng)
                 grid.querySelector(`.target-card[data-player-id="${myTarget}"]`)?.classList.add('selected');
              }
         }
@@ -1052,7 +1066,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             Object.keys(players).forEach(pId => {
                 if (players[pId].isAlive) {
-                     // Phù thủy có thể tự cứu/giết
                     const card = document.createElement('div');
                     card.className = 'target-card';
                     card.dataset.playerId = pId;
@@ -1077,7 +1090,6 @@ document.addEventListener('DOMContentLoaded', () => {
         content.querySelector('#witch-save-btn').addEventListener('click', () => renderWitchTargets('save'));
         content.querySelector('#witch-kill-btn').addEventListener('click', () => renderWitchTargets('kill'));
         
-        // Tự động hiển thị target nếu đã chọn
         if (myAction && myAction.action === 'witch') {
              renderWitchTargets(myAction.choice);
         }
@@ -1122,16 +1134,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.addEventListener('click', () => {
                     if (card.classList.contains('disabled')) return;
                     
-                    // Reset
                     grid.querySelectorAll('.target-card').forEach(el => el.classList.remove('selected'));
                     content.querySelector('#assassin-guess-grid')?.remove();
                     
                     card.classList.add('selected');
-                    // Gửi action (chưa đoán)
                     database.ref(actionPath).set({
                          action: 'assassin',
                          targetId: pId,
-                         guessedRole: myAction?.guessedRole || null // Giữ lại vai trò đã đoán nếu có
+                         guessedRole: myAction?.guessedRole || null 
                     });
                     renderAssassinGuessList(content, pId, nightNum, myAction?.guessedRole);
                 });
@@ -1141,7 +1151,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         content.appendChild(targetGrid);
         
-        // Nếu đã chọn target, render lại lưới đoán
         if (myAction && myAction.targetId) {
              renderAssassinGuessList(content, myAction.targetId, nightNum, myAction.guessedRole);
         }
@@ -1169,7 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const uniqueRoles = [...new Set(rolesInGame)]; 
         
         uniqueRoles.forEach(roleName => {
-            if (roleName === 'Dân thường' || !allRolesData[roleName]) return; // Bỏ qua Dân hoặc vai trò không tồn tại
+            if (roleName === 'Dân thường' || !allRolesData[roleName]) return; 
             
             const btn = document.createElement('button');
             btn.className = 'choice-btn';
@@ -1185,7 +1194,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     targetId: targetId,
                     guessedRole: roleName
                 });
-                // (Cập nhật lại UI sau khi click)
                 guessGrid.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
             });
@@ -1341,7 +1349,6 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.toggle('active', btn.dataset.channel === newChannel);
         });
         chatMessages.innerHTML = '';
-        // (Nên tải lại lịch sử chat ở đây)
     }
 
     /**
