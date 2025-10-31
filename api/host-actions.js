@@ -3,26 +3,29 @@
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
-import { fetchSheetData, setGamePhase } from '../game-engine.js'; // Import các hàm từ game-engine
+// SỬA LỖI ĐƯỜNG DẪN IMPORT:
+// ../game-engine.js (SAI) -> ./game-engine.js (ĐÚNG)
+import { fetchSheetData, setGamePhase } from './game-engine.js'; 
 
 // --- 1. KHỞI TẠO FIREBASE ADMIN (Singleton Pattern) ---
 let firebaseAdminApp;
 function getFirebaseAdmin() {
-    if (!firebaseAdminApp) {
-        if (getApps().length > 0) {
-            firebaseAdminApp = getApps()[0];
-        } else {
-            try {
-                const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-                const databaseURL = process.env.FIREBASE_DATABASE_URL;
-                firebaseAdminApp = initializeApp({
-                    credential: cert(serviceAccount),
-                    databaseURL: databaseURL,
-                }, 'firebaseAdminHostActions'); // Đặt tên riêng cho instance này
-            } catch (e) {
-                console.error("Lỗi Khởi Tạo Firebase Admin SDK (host-actions):", e);
-                throw new Error("Không thể khởi tạo Firebase Admin SDK.");
-            }
+    // Đặt tên riêng cho instance này để tránh xung đột với các API khác
+    const APP_NAME = 'firebaseAdminHostActions';
+    
+    if (getApps().find(app => app.name === APP_NAME)) {
+        firebaseAdminApp = getApps().find(app => app.name === APP_NAME);
+    } else {
+        try {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            const databaseURL = process.env.FIREBASE_DATABASE_URL;
+            firebaseAdminApp = initializeApp({
+                credential: cert(serviceAccount),
+                databaseURL: databaseURL,
+            }, APP_NAME); // Đặt tên riêng
+        } catch (e) {
+            console.error("Lỗi Khởi Tạo Firebase Admin SDK (host-actions):", e);
+            throw new Error("Không thể khởi tạo Firebase Admin SDK.");
         }
     }
     return firebaseAdminApp;
@@ -105,6 +108,8 @@ export default async function handler(request, response) {
                 // Kiểm tra trùng tên
                 const playerExists = Object.values(roomData.players).some(p => p.username === username);
                 if (playerExists) {
+                    // Cho phép vào lại nếu đã ở trong phòng (Reconnect)
+                    // (Thêm logic này nếu cần, hiện tại đang chặn)
                     throw new Error('Tên này đã có người sử dụng trong phòng.');
                 }
 
@@ -125,10 +130,13 @@ export default async function handler(request, response) {
                 const roomRef = db.ref(`rooms/${roomId}`);
                 const hostIdSnapshot = await roomRef.child('hostId').once('value');
                 const hostId = hostIdSnapshot.val();
-                const hostPlayerSnapshot = await roomRef.child(`players/${hostId}`).once('value');
-                const hostUsername = hostPlayerSnapshot.val()?.username;
+                
+                // Tìm player có username trùng
+                const playersSnapshot = await roomRef.child('players').once('value');
+                const players = playersSnapshot.val() || {};
+                const matchingPlayerId = Object.keys(players).find(pId => players[pId].username === username);
 
-                if (hostUsername !== username) {
+                if (!matchingPlayerId || matchingPlayerId !== hostId) {
                     throw new Error('Bạn không phải Host, không có quyền thực hiện hành động này.');
                 }
 
@@ -136,11 +144,13 @@ export default async function handler(request, response) {
                 switch (action) {
                     
                     case 'kick-player':
+                        if (playerId === hostId) throw new Error("Host không thể tự kick mình.");
                         await db.ref(`rooms/${roomId}/players/${playerId}`).remove();
                         return response.status(200).json({ success: true, message: 'Đã kick người chơi.' });
 
                     case 'start-game':
-                        await handleStartGame(db, roomId);
+                        // Lấy gameSettings từ body (do player.js gửi lên)
+                        await handleStartGame(db, roomId, roomData.players, roles);
                         return response.status(200).json({ success: true, message: 'Game đã bắt đầu.' });
                         
                     case 'skip-phase':
@@ -186,27 +196,20 @@ export default async function handler(request, response) {
 /**
  * Xử lý logic khi Host bắt đầu game
  */
-async function handleStartGame(db, roomId) {
-    const roomRef = db.ref(`rooms/${roomId}`);
-    const snapshot = await roomRef.once('value');
-    const roomData = snapshot.val();
-    
-    const players = roomData.players;
+async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
     const playerCount = playerIds.length;
     
-    // 1. Lấy vai trò đã cài đặt
-    let rolesToAssign = roomData.gameSettings?.roles || [];
-    
-    // 2. Kiểm tra điều kiện (Code từ player.js, đưa về backend)
+    // 1. Kiểm tra điều kiện (lấy roles từ body)
     if (playerCount < 4) throw new Error('Cần tối thiểu 4 người chơi để bắt đầu.');
+    if (!rolesToAssign || rolesToAssign.length === 0) throw new Error('Host chưa chọn vai trò.');
     if (playerCount !== rolesToAssign.length) throw new Error(`Số người chơi (${playerCount}) không khớp số vai trò (${rolesToAssign.length}).`);
     
     const allRolesData = await fetchSheetData('Roles'); // Lấy dữ liệu vai trò
     const hasWolf = rolesToAssign.some(roleName => allRolesData[roleName]?.Faction === 'Bầy Sói');
     if (!hasWolf) throw new Error('Game phải có tối thiểu 1 vai trò thuộc Bầy Sói.');
 
-    // 3. Trộn và phân vai
+    // 2. Trộn và phân vai
     rolesToAssign.sort(() => Math.random() - 0.5); // Xáo trộn vai trò
     const updates = {};
     
@@ -215,18 +218,19 @@ async function handleStartGame(db, roomId) {
         const roleData = allRolesData[assignedRoleName] || {};
         
         updates[`/players/${pId}/roleName`] = assignedRoleName;
-        updates[`/players/${pId}/faction`] = roleData.Faction;
+        updates[`/players/${pId}/faction`] = roleData.Faction || 'Phe Dân'; // Faction mặc định
         updates[`/players/${pId}/isAlive`] = true; // Đảm bảo mọi người đều sống
         updates[`/players/${pId}/state`] = {}; // Reset state
     });
 
-    // 4. Bắt đầu phase đầu tiên (DAY_1_INTRO)
+    // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
     updates['/gameState/phase'] = 'DAY_1_INTRO';
     updates['/gameState/startTime'] = firebase.database.ServerValue.TIMESTAMP;
     updates['/gameState/duration'] = 15; // 15 giây giới thiệu
     updates['/gameState/nightNumber'] = 1;
+    updates['/gameSettings/roles'] = rolesToAssign; // Lưu lại bộ vai trò đã chọn
 
-    await roomRef.update(updates);
+    await db.ref(`rooms/${roomId}`).update(updates);
 }
 
 /**
@@ -235,6 +239,7 @@ async function handleStartGame(db, roomId) {
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
     const snapshot = await roomRef.once('value');
+    if (!snapshot.exists()) return; // Phòng đã bị xóa
     const roomData = snapshot.val();
 
     const updates = {};
@@ -258,17 +263,16 @@ async function resetGame(db, roomId, keepRoles) {
     updates['/privateData'] = null;
     updates['/chat'] = null; // Xóa lịch sử chat
     
-    if (keepRoles) {
-        // Nếu là "Khởi động lại", bắt đầu game ngay
-        updates['/gameState/phase'] = 'DAY_1_INTRO';
-        updates['/gameState/startTime'] = firebase.database.ServerValue.TIMESTAMP;
-        updates['/gameState/duration'] = 15;
-        updates['/gameState/nightNumber'] = 1;
+    if (keepRoles && roomData.gameSettings?.roles) {
+        // Nếu là "Khởi động lại", bắt đầu game ngay với vai trò cũ
+        // (Cần chạy lại logic phân vai)
+        await handleStartGame(db, roomId, roomData.players, roomData.gameSettings.roles);
     } else {
         // Nếu là "Thiết lập lại", quay về phòng chờ
         updates['/gameState/phase'] = 'waiting';
         updates['/gameState/startTime'] = firebase.database.ServerValue.TIMESTAMP;
         updates['/gameState/duration'] = 99999;
+        updates['/gameSettings/roles'] = []; // Xóa bộ vai trò
     }
     
     await roomRef.update(updates);
