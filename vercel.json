@@ -1,9 +1,9 @@
 {
-  "version": 2,
-  "crons": [
-    {
-      "path": "/api/cron/process-games",
-      "schedule": "* * * * *"
-    }
-  ]
+  "version": 2
+  // "crons": [
+  //   {
+  //     "path": "/api/cron/process-games",
+  //     "schedule": "* * * * *"
+  //   }
+  // ]
 }
