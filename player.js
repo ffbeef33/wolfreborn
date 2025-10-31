@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let currentRoomData = null;
     
-    // *** SỬA LỖI 2 (Hết lag): Thêm cờ để ngăn trigger loop nhiều lần ***
     let hasTriggeredLoop = false;
 
 
@@ -91,6 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const waitingTitle = getEl('waiting-title');
     const waitingMessage = getEl('waiting-message');
     const roleRevealSection = getEl('role-reveal-section');
+    // *** SỬA LỖI 1: Lấy DOM timer container mới ***
+    const roleRevealTimerContainer = getEl('role-reveal-timer-container');
     const votingUiSection = getEl('voting-ui-section');
     const voteTitleDisplay = getEl('vote-title-display');
     const voteTimerDisplay = getEl('vote-timer-display');
@@ -253,12 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Xử lý chọn vai trò (Host)
         roleSelectionGrid.addEventListener('change', updateRoleSelectionCount);
         
-        // Listener cho thẻ bài
-        roleRevealSection.addEventListener('click', () => {
-             // Chỉ cho phép lật nếu đang ở phase DAY_1_INTRO
-             if (currentRoomData?.gameState?.phase === 'DAY_1_INTRO') {
-                roleRevealSection.classList.toggle('is-flipped');
-             }
+        // *** SỬA LỖI 1: Cho phép lật thẻ bất cứ lúc nào ***
+        roleRevealSection.addEventListener('click', (e) => {
+            // Ngăn việc click vào timer (nếu có) làm lật thẻ
+            if (e.target.closest('#role-reveal-timer-container')) return;
+            
+             roleRevealSection.classList.toggle('is-flipped');
         });
     }
     
@@ -619,15 +620,15 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hàm chính điều khiển giao diện dựa trên phase
      */
     function updateMainUI(gameState, myPlayerData) {
-        // *** BẮT ĐẦU SỬA LỖI 1, 2 & 3 ***
         
         // 1. Ẩn các card trạng thái chính (trừ Role Card)
         [waitingSection, votingUiSection, phaseDisplaySection, interactiveActionSection].forEach(el => el.classList.add('hidden'));
 
-        // 2. Reset cờ trigger loop (Sửa Lỗi 2)
+        // *** SỬA LỖI 1: Ẩn timer của role card (sẽ được bật lại nếu cần) ***
+        roleRevealTimerContainer.classList.add('hidden');
+
+        // 2. Reset cờ trigger loop
         hasTriggeredLoop = false;
-        
-        // *** KẾT THÚC SỬA LỖI ***
         
         if (!myPlayerData) {
              console.error("Không tìm thấy myPlayerData!");
@@ -655,27 +656,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const nightNum = gameState.nightNumber || 0;
         
-        // *** SỬA LỖI 3 (Persistent Card): Xử lý hiển thị Role Card ***
+        // Xử lý hiển thị Role Card
         if (gameState.phase === 'waiting') {
             roleRevealSection.classList.add('hidden'); // Ẩn khi chờ
             roleRevealSection.classList.remove('is-flipped'); // Lật úp lại
         } else {
             roleRevealSection.classList.remove('hidden'); // Hiển thị trong tất cả các phase khác
         }
-        // *** KẾT THÚC SỬA LỖI 3 ***
-
 
         switch (gameState.phase) {
             case 'waiting':
-                waitingSection.classList.remove('hidden');
-                waitingTitle.textContent = "Đang chờ Host...";
-                waitingMessage.textContent = "Host đang cài đặt vai trò. Trò chơi sẽ sớm bắt đầu.";
+                // (đã xử lý ở trên)
                 break;
             
             case 'DAY_1_INTRO':
-                // *** SỬA LỖI 1 (Timer Lật Bài): Tự động lật thẻ bài ***
+                // Tự động lật thẻ
                 roleRevealSection.classList.add('is-flipped'); 
                 
+                // *** SỬA LỖI 1: Hiển thị timer ***
+                roleRevealTimerContainer.classList.remove('hidden');
+
                 if (myPlayerData.roleName) {
                     renderRoleCard(myPlayerData.roleName, myPlayerData.faction);
                 } else {
@@ -684,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'NIGHT':
-                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
+                // (Không ép lật thẻ nữa)
                 if (myPlayerData.isAlive) {
                     interactiveActionSection.classList.remove('hidden');
                     renderNightActions(myPlayerData, nightNum);
@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'DAY_RESULT':
             case 'VOTE_RESULT':
             case 'GAME_END':
-                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
+                // (Không ép lật thẻ nữa)
                 phaseDisplaySection.classList.remove('hidden');
                 phaseTitle.textContent = "Kết Quả";
                 if (gameState.phase === 'GAME_END') {
@@ -707,7 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'DAY_DISCUSS':
-                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
+                // (Không ép lật thẻ nữa)
                 phaseDisplaySection.classList.remove('hidden');
                 phaseTitle.textContent = `Ngày ${nightNum}`;
                 phaseMessage.textContent = "Thảo luận để tìm ra Sói!";
@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'VOTE':
-                roleRevealSection.classList.add('is-flipped'); // Đảm bảo thẻ vẫn lật
+                // (Không ép lật thẻ nữa)
                 if (myPlayerData.isAlive) {
                     votingUiSection.classList.remove('hidden');
                     renderVoting(gameState);
@@ -750,15 +750,15 @@ document.addEventListener('DOMContentLoaded', () => {
             visibleTimerDisplay = voteTimerDisplay;
         } else if (!phaseDisplaySection.classList.contains('hidden')) {
             visibleTimerDisplay = phaseTimerDisplay;
-        } else if (!roleRevealSection.classList.contains('hidden') && gameState.phase === 'DAY_1_INTRO') {
-            // *** SỬA LỖI 1: Chỉ lấy timer này khi nó đang ở phase INTRO ***
-            visibleTimerDisplay = getEl('role-reveal-timer-display');
+        
+        // *** SỬA LỖI 1: Kiểm tra xem timer container có đang hiện không ***
+        } else if (!roleRevealTimerContainer.classList.contains('hidden')) { 
+            visibleTimerDisplay = getEl('role-reveal-timer-display'); // Vẫn là strong <strong>
+        
         } else if (!interactiveActionSection.classList.contains('hidden')) {
             visibleTimerDisplay = getEl('night-phase-timer-display');
         }
         
-        // Nếu không tìm thấy timer (ví dụ: thẻ role đang hiển thị nhưng ở phase NIGHT)
-        // thì không cần chạy đồng hồ
         if (!visibleTimerDisplay) return;
         
         const endTime = (gameState.startTime || 0) + (gameState.duration * 1000);
@@ -774,23 +774,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(window.phaseTimerInterval);
                 if (visibleTimerDisplay) visibleTimerDisplay.textContent = "0:00";
                 
-                // *** BẮT ĐẦU SỬA LỖI 2 (Hết lag) ***
-                // Chỉ trigger 1 lần, và không trigger khi đang chờ
+                // (Đã sửa lỗi lag ở phiên trước)
                 if (!hasTriggeredLoop && currentRoomId && gameState.phase !== 'waiting' && gameState.phase !== 'GAME_END') {
-                    hasTriggeredLoop = true; // Đánh dấu đã trigger
+                    hasTriggeredLoop = true; 
                     console.log("Timer hit 0. Triggering game loop...");
                     
-                    // Gọi API mới
                     fetch('/api/trigger-loop', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ roomId: currentRoomId })
                     }).catch(err => {
                         console.error("Lỗi khi trigger loop:", err);
-                        hasTriggeredLoop = false; // Cho phép thử lại nếu lỗi
+                        hasTriggeredLoop = false; 
                     });
                 }
-                // *** KẾT THÚC SỬA LỖI 2 ***
             }
         }
         updateClock();
