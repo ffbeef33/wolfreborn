@@ -71,7 +71,7 @@
                 <p>Phòng: <strong id="room-id-display">...</strong> | Host: <strong id="host-name-display">...</strong></p>
             </header>
 
-            <div id="host-controls" class="card hidden">
+             <div id="host-controls" class="card hidden">
                 <h3><i class="fas fa-crown"></i> Bảng Điều Khiển Host</h3>
                 <div id="host-lobby-controls">
                     <h4>Phòng chờ</h4>
@@ -155,10 +155,12 @@
                     <button id="send-message-btn">Gửi</button>
                 </div>
             </section>
+        </aside>
 
-            </aside>
+    </div> 
 
-    </div> <div id="role-description-modal" class="modal hidden">
+
+    <div id="role-description-modal" class="modal hidden">
         <div class="modal-content"><span class="close-modal-btn">&times;</span><h2 id="modal-role-name">Tên Vai Trò</h2><h4 id="modal-role-faction">Phe</h4><p id="modal-role-description">Mô tả vai trò.</p></div>
     </div>
     <div id="will-writing-modal" class="modal hidden">
@@ -173,42 +175,30 @@
      
      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <script src="player.js"></script>
+
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var username = sessionStorage.getItem('mywolf_username');
-        
-        // *** THAY ĐỔI: Chọn container mới ***
         var lobbyContainer = document.getElementById('lobby-container');
         var gameDashboard = document.getElementById('game-dashboard-container');
-        
         var currentRoomId = sessionStorage.getItem('mywolf_roomid');
 
         if (username) {
             if (currentRoomId) {
-                // Vào thẳng game
-                lobbyContainer.classList.add('hidden');
-                gameDashboard.classList.remove('hidden'); // Hiển thị dashboard
+                // Nếu có phòng, ẨN lobby và HIỆN game
+                // player.js sẽ gọi showGameRoom() để xử lý việc này
             } else {
-                // Hiển thị sảnh chờ
+                // Nếu không có phòng, HIỆN lobby và ẨN game
                 lobbyContainer.classList.remove('hidden');
-                gameDashboard.classList.add('hidden'); // Ẩn dashboard
+                gameDashboard.classList.add('hidden');
                 document.getElementById('lobby-player-name').textContent = username;
             }
         } else {
+            // Không đăng nhập, quay về index
             window.location.href = 'index.html'; 
         }
-
-        // Tách logic hiển thị lobby/game ra khỏi player.js
-        // (Đây là logic cũ của bạn, tôi giữ nguyên nhưng thay đổi target)
-        window.showLobby = function() {
-            lobbyContainer.classList.remove('hidden');
-            gameDashboard.classList.add('hidden');
-        };
-        window.showGameRoom = function() {
-            lobbyContainer.classList.add('hidden');
-            gameDashboard.classList.remove('hidden');
-        };
     });
     </script>
 </body>

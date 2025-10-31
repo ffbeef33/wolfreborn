@@ -45,8 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 4. DOM ELEMENTS (Lấy 1 lần) ---
     const getEl = (id) => document.getElementById(id);
 
-    // Lobby
-    const lobbySection = getEl('lobby-section');
+    // *** BẮT ĐẦU SỬA LỖI: Cập nhật ID container chính ***
+    const lobbyContainer = getEl('lobby-container'); // Thay vì lobbySection
     const lobbyPlayerName = getEl('lobby-player-name');
     const createRoomBtn = getEl('create-room-btn');
     const createRoomOptions = getEl('create-room-options');
@@ -61,10 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const joinRoomError = getEl('join-room-error');
 
     // Game Room
-    const gameRoomSection = getEl('game-room-section');
+    const gameDashboard = getEl('game-dashboard-container'); // Thay vì gameRoomSection
     const playerNameDisplay = getEl('player-name-display');
     const roomIdDisplay = getEl('room-id-display');
     const hostNameDisplay = getEl('host-name-display');
+    // *** KẾT THÚC SỬA LỖI ***
 
     // Host
     const hostControls = getEl('host-controls');
@@ -90,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const waitingTitle = getEl('waiting-title');
     const waitingMessage = getEl('waiting-message');
     const roleRevealSection = getEl('role-reveal-section');
-    // *** SỬA LỖI 1: Lấy DOM timer container mới ***
     const roleRevealTimerContainer = getEl('role-reveal-timer-container');
     const votingUiSection = getEl('voting-ui-section');
     const voteTitleDisplay = getEl('vote-title-display');
@@ -174,12 +174,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentRoomId = sessionStorage.getItem('mywolf_roomid');
         if (currentRoomId) {
             // Nếu có, thử vào thẳng phòng
-            showGameRoom();
+            showGameRoom(); // <-- Sửa lỗi: hàm này sẽ chạy đúng
             attachMainRoomListener(currentRoomId);
             attachChatListeners(currentRoomId);
         } else {
             // Nếu không, hiển thị sảnh chờ
-            showLobby();
+            showLobby(); // <-- Sửa lỗi: hàm này sẽ chạy đúng
         }
 
         // Gắn listener chung
@@ -190,8 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị sảnh chờ và tải danh sách phòng
      */
     function showLobby() {
-        lobbySection.classList.remove('hidden');
-        gameRoomSection.classList.add('hidden');
+        // *** SỬA LỖI: Dùng biến mới ***
+        lobbyContainer.classList.remove('hidden');
+        gameDashboard.classList.add('hidden');
         lobbyPlayerName.textContent = myUsername;
         fetchRoomList();
     }
@@ -200,8 +201,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * Hiển thị phòng game
      */
     function showGameRoom() {
-        lobbySection.classList.add('hidden');
-        gameRoomSection.classList.remove('hidden');
+        // *** SỬA LỖI: Dùng biến mới ***
+        lobbyContainer.classList.add('hidden');
+        gameDashboard.classList.remove('hidden');
         playerNameDisplay.textContent = myUsername;
     }
 
@@ -254,11 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Xử lý chọn vai trò (Host)
         roleSelectionGrid.addEventListener('change', updateRoleSelectionCount);
         
-        // *** SỬA LỖI 1: Cho phép lật thẻ bất cứ lúc nào ***
+        // Listener cho thẻ bài
         roleRevealSection.addEventListener('click', (e) => {
-            // Ngăn việc click vào timer (nếu có) làm lật thẻ
             if (e.target.closest('#role-reveal-timer-container')) return;
-            
              roleRevealSection.classList.toggle('is-flipped');
         });
     }
@@ -624,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. Ẩn các card trạng thái chính (trừ Role Card)
         [waitingSection, votingUiSection, phaseDisplaySection, interactiveActionSection].forEach(el => el.classList.add('hidden'));
 
-        // *** SỬA LỖI 1: Ẩn timer của role card (sẽ được bật lại nếu cần) ***
+        // Ẩn timer của role card (sẽ được bật lại nếu cần)
         roleRevealTimerContainer.classList.add('hidden');
 
         // 2. Reset cờ trigger loop
@@ -670,10 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             
             case 'DAY_1_INTRO':
-                // Tự động lật thẻ
                 roleRevealSection.classList.add('is-flipped'); 
-                
-                // *** SỬA LỖI 1: Hiển thị timer ***
                 roleRevealTimerContainer.classList.remove('hidden');
 
                 if (myPlayerData.roleName) {
@@ -684,7 +681,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'NIGHT':
-                // (Không ép lật thẻ nữa)
                 if (myPlayerData.isAlive) {
                     interactiveActionSection.classList.remove('hidden');
                     renderNightActions(myPlayerData, nightNum);
@@ -698,7 +694,6 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'DAY_RESULT':
             case 'VOTE_RESULT':
             case 'GAME_END':
-                // (Không ép lật thẻ nữa)
                 phaseDisplaySection.classList.remove('hidden');
                 phaseTitle.textContent = "Kết Quả";
                 if (gameState.phase === 'GAME_END') {
@@ -707,7 +702,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'DAY_DISCUSS':
-                // (Không ép lật thẻ nữa)
                 phaseDisplaySection.classList.remove('hidden');
                 phaseTitle.textContent = `Ngày ${nightNum}`;
                 phaseMessage.textContent = "Thảo luận để tìm ra Sói!";
@@ -715,7 +709,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
 
             case 'VOTE':
-                // (Không ép lật thẻ nữa)
                 if (myPlayerData.isAlive) {
                     votingUiSection.classList.remove('hidden');
                     renderVoting(gameState);
@@ -750,11 +743,8 @@ document.addEventListener('DOMContentLoaded', () => {
             visibleTimerDisplay = voteTimerDisplay;
         } else if (!phaseDisplaySection.classList.contains('hidden')) {
             visibleTimerDisplay = phaseTimerDisplay;
-        
-        // *** SỬA LỖI 1: Kiểm tra xem timer container có đang hiện không ***
         } else if (!roleRevealTimerContainer.classList.contains('hidden')) { 
-            visibleTimerDisplay = getEl('role-reveal-timer-display'); // Vẫn là strong <strong>
-        
+            visibleTimerDisplay = getEl('role-reveal-timer-display');
         } else if (!interactiveActionSection.classList.contains('hidden')) {
             visibleTimerDisplay = getEl('night-phase-timer-display');
         }
@@ -774,7 +764,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(window.phaseTimerInterval);
                 if (visibleTimerDisplay) visibleTimerDisplay.textContent = "0:00";
                 
-                // (Đã sửa lỗi lag ở phiên trước)
                 if (!hasTriggeredLoop && currentRoomId && gameState.phase !== 'waiting' && gameState.phase !== 'GAME_END') {
                     hasTriggeredLoop = true; 
                     console.log("Timer hit 0. Triggering game loop...");
