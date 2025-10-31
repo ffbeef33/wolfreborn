@@ -8,28 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
     <link rel="stylesheet" href="assets/player-style.css">
-    <style>
-        /* (Các style của bạn sẽ được tải từ player-style.css) */
-        /* CSS tạm thời cho các thành phần mới (nên chuyển vào player-style.css) */
-        #lobby-section, #game-room-section { margin-bottom: 20px; }
-        #room-list { max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; margin-bottom: 15px; }
-        .room-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color); }
-        .room-item:last-child { border-bottom: none; }
-        .room-item span { font-weight: bold; }
-        #player-list-ingame { list-style: none; padding: 0; }
-        #host-controls button, #player-controls button { margin-top: 5px; width: auto; padding: 8px 15px; font-size: 0.9em;}
-        #chat-section { margin-top: 20px; }
-        #chat-channels button { /* Style tabs */ }
-        #chat-messages { height: 200px; overflow-y: scroll; border: 1px solid var(--border-color); padding: 10px; margin-bottom: 10px; background-color: var(--primary-bg); text-align: left;}
-        #chat-input { display: flex; gap: 10px; }
-        #chat-input input { flex-grow: 1; }
-        .message-item { margin-bottom: 5px; }
-        .message-sender { font-weight: bold; }
-    </style>
+    
 </head>
 <body>
-    <div class="container">
+    
+    <div class="container" id="lobby-container">
         <section id="lobby-section" class="card">
             <header class="player-header">
                 <h1>Chào, <span id="lobby-player-name">...</span>!</h1>
@@ -47,22 +32,46 @@
             <h3 style="margin-top: 20px;">Phòng Đang Mở</h3>
             <div id="room-list">
                 <p>Đang tải danh sách phòng...</p>
-                </div>
+            </div>
             <div id="join-password-section" class="hidden" style="margin-top: 15px;">
                 <input type="password" id="join-password-input" placeholder="Nhập mật khẩu phòng" class="password-input">
                 <button id="confirm-join-room-btn">Vào Phòng</button>
                  <p id="join-room-error" class="error-message"></p>
             </div>
         </section>
+    </div>
 
-        <section id="game-room-section" class="hidden">
-            <header class="player-header">
+    <div class="game-dashboard hidden" id="game-dashboard-container">
+
+        <aside class="game-sidebar" id="sidebar-left">
+            
+            <section id="player-list-section" class="card">
+                <h3><i class="fas fa-users"></i> Người Chơi (<span id="player-count-display">0</span>)</h3>
+                <ul id="player-list-ingame">
+                    </ul>
+            </section>
+            
+            <div id="player-controls">
+                <button id="open-will-modal-btn" class="player-action-btn">
+                    <i class="fa-solid fa-pencil"></i> Viết Di Chúc
+                </button>
+            </div>
+
+            <section id="private-log-section" class="card hidden">
+                <h2><i class="fas fa-user-secret"></i> Nhật Ký Riêng</h2>
+                <div id="private-log-content">
+                    </div>
+            </section>
+        </aside>
+
+        <main class="game-main-content">
+            
+            <header class="player-header card">
                 <h1><span id="player-name-display">...</span></h1>
-                <p>Phòng: <strong id="room-id-display">...</strong></p>
-                <p>Host: <strong id="host-name-display">...</strong></p>
+                <p>Phòng: <strong id="room-id-display">...</strong> | Host: <strong id="host-name-display">...</strong></p>
             </header>
 
-             <div id="host-controls" class="card hidden">
+            <div id="host-controls" class="card hidden">
                 <h3><i class="fas fa-crown"></i> Bảng Điều Khiển Host</h3>
                 <div id="host-lobby-controls">
                     <h4>Phòng chờ</h4>
@@ -82,38 +91,32 @@
                  <button id="host-delete-room-btn" class="btn-danger" style="margin-top: 15px;"><i class="fas fa-trash-alt"></i> Xóa Phòng</button>
             </div>
 
-            <div id="player-list-section" class="card">
-                <h3>Người Chơi Trong Phòng (<span id="player-count-display">0</span>)</h3>
-                <ul id="player-list-ingame">
-                    </ul>
-            </div>
-
-            <main id="game-view">
+            <div id="game-view">
+                
+                <div id="role-reveal-section" class="game-card role-card hidden">
+                    <div class="card-inner">
+                        <div class="card-front">
+                            <div class="card-logo">?</div>
+                            <p>Chạm để khám phá vai trò</p>
+                        </div>
+                        <div class="card-back">
+                            <i id="role-icon" class="role-icon"></i>
+                            <h2 id="role-name">Tên Vai Trò</h2>
+                            <p id="role-faction" class="role-faction"></p>
+                            <p id="role-description" class="role-description"></p>
+                        </div>
+                    </div>
+                    <p id="role-reveal-timer-container" class="timer hidden">
+                        Bắt đầu sau: <strong id="role-reveal-timer-display">--</strong>
+                    </p>
+                </div>
+                
                 <div id="game-state-cards">
                     <div id="waiting-section" class="game-card waiting-card">
                         <h2 id="waiting-title">Đang chờ Host...</h2>
                         <p id="waiting-message" class="waiting-message">Chờ Host bắt đầu game hoặc chọn vai trò...</p>
                     </div>
 
-                    <div id="role-reveal-section" class="game-card role-card hidden">
-                        <div class="card-inner">
-                            <div class="card-front">
-                                <div class="card-logo">?</div>
-                                <p>Chạm để khám phá vai trò</p>
-                            </div>
-                            <div class="card-back">
-                                <i id="role-icon" class="role-icon"></i>
-                                <h2 id="role-name">Tên Vai Trò</h2>
-                                <p id="role-faction" class="role-faction"></p>
-                                
-                                <p id="role-description" class="role-description"></p>
-                            </div>
-                        </div>
-
-                        <p id="role-reveal-timer-container" class="timer hidden" style="font-size: 1.1rem; margin-top: 20px; color: var(--light-text);">
-                            Bắt đầu sau: <strong id="role-reveal-timer-display">--</strong>
-                        </p>
-                    </div>
                     <div id="voting-ui-section" class="game-card hidden">
                         <h2 id="vote-title-display">Biểu Quyết</h2>
                         <p class="timer">Thời gian còn lại: <strong id="vote-timer-display">--</strong></p>
@@ -129,45 +132,33 @@
                         <div id="phase-results" style="margin-top: 15px;">
                             </div>
                     </div>
-
-                </div>
-
-                <div id="private-log-section" class="game-card hidden">
-                    <h2><i class="fas fa-user-secret"></i> Nhật Ký Riêng</h2>
-                    <div id="private-log-content"></div>
                 </div>
 
                 <div id="interactive-action-section" class="hidden">
                     </div>
+            </div>
+        </main>
 
-                <div id="player-controls">
-                    <button id="open-will-modal-btn" class="player-action-btn">
-                        <i class="fa-solid fa-pencil"></i> Viết Di Chúc
-                    </button>
+        <aside class="game-sidebar" id="sidebar-right">
+            
+            <section id="chat-section" class="card">
+                <h3><i class="fas fa-comments"></i> Chat</h3>
+                <div id="chat-channels">
+                    <button class="channel-btn active" data-channel="living">Người Sống</button>
+                    <button class="channel-btn" data-channel="dead">Người Chết</button>
+                    <button class="channel-btn hidden" data-channel="wolves">Bầy Sói</button>
+                </div>
+                <div id="chat-messages">
                     </div>
+                <div id="chat-input">
+                    <input type="text" id="message-input" placeholder="Nhập tin nhắn..." class="password-input">
+                    <button id="send-message-btn">Gửi</button>
+                </div>
+            </section>
 
-                <section id="chat-section" class="card">
-                    <h3><i class="fas fa-comments"></i> Chat</h3>
-                    <div id="chat-channels" style="margin-bottom: 10px;">
-                        <button class="channel-btn active" data-channel="living">Người Sống</button>
-                        <button class="channel-btn" data-channel="dead">Người Chết</button>
-                        <button class="channel-btn hidden" data-channel="wolves">Bầy Sói</button>
-                    </div>
-                    <div id="chat-messages">
-                        </div>
-                    <div id="chat-input">
-                        <input type="text" id="message-input" placeholder="Nhập tin nhắn..." class="password-input">
-                        <button id="send-message-btn">Gửi</button>
-                    </div>
-                </section>
+            </aside>
 
-                <div id="roles-in-game-display" class="roles-display-container hidden">
-                    </div>
-            </main>
-        </section>
-    </div>
-
-    <div id="role-description-modal" class="modal hidden">
+    </div> <div id="role-description-modal" class="modal hidden">
         <div class="modal-content"><span class="close-modal-btn">&times;</span><h2 id="modal-role-name">Tên Vai Trò</h2><h4 id="modal-role-faction">Phe</h4><p id="modal-role-description">Mô tả vai trò.</p></div>
     </div>
     <div id="will-writing-modal" class="modal hidden">
@@ -179,37 +170,45 @@
     <div id="announcement-modal" class="modal hidden">
          <div class="modal-content"><span class="close-modal-btn">&times;</span><h2><i class="fas fa-bullhorn"></i> Thông Báo</h2><div id="announcement-content" class="will-content-display"></div></div>
      </div>
+     
      <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
     <script src="player.js"></script>
-
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var username = sessionStorage.getItem('mywolf_username');
-        var lobbySection = document.getElementById('lobby-section');
-        var gameRoomSection = document.getElementById('game-room-section');
+        
+        // *** THAY ĐỔI: Chọn container mới ***
+        var lobbyContainer = document.getElementById('lobby-container');
+        var gameDashboard = document.getElementById('game-dashboard-container');
         
         var currentRoomId = sessionStorage.getItem('mywolf_roomid');
 
         if (username) {
-            // User is logged in, show lobby or game room based on session/state
             if (currentRoomId) {
-                // Nếu người chơi load lại trang và vẫn còn room_id,
-                // chuyển thẳng vào phòng game. player.js sẽ xử lý việc kết nối.
-                lobbySection.classList.add('hidden');
-                gameRoomSection.classList.remove('hidden');
+                // Vào thẳng game
+                lobbyContainer.classList.add('hidden');
+                gameDashboard.classList.remove('hidden'); // Hiển thị dashboard
             } else {
-                // Nếu mới đăng nhập, hiển thị sảnh chờ
-                lobbySection.classList.remove('hidden');
-                gameRoomSection.classList.add('hidden');
+                // Hiển thị sảnh chờ
+                lobbyContainer.classList.remove('hidden');
+                gameDashboard.classList.add('hidden'); // Ẩn dashboard
                 document.getElementById('lobby-player-name').textContent = username;
-                // player.js sẽ tự động chạy và gọi hàm fetchRoomList()
             }
         } else {
-            // User not logged in, redirect to index.html
             window.location.href = 'index.html'; 
         }
+
+        // Tách logic hiển thị lobby/game ra khỏi player.js
+        // (Đây là logic cũ của bạn, tôi giữ nguyên nhưng thay đổi target)
+        window.showLobby = function() {
+            lobbyContainer.classList.remove('hidden');
+            gameDashboard.classList.add('hidden');
+        };
+        window.showGameRoom = function() {
+            lobbyContainer.classList.add('hidden');
+            gameDashboard.classList.remove('hidden');
+        };
     });
     </script>
 </body>
