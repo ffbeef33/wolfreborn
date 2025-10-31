@@ -103,8 +103,10 @@ export async function fetchSheetData(sheetName) {
                 headers.forEach((header, index) => {
                     role[header] = (row[index] !== undefined && row[index] !== null) ? String(row[index]) : '';
                 });
-                if (role.RoleName) {
-                    rolesObj[role.RoleName] = role;
+                
+                // *** SỬA LỖI: LỌC HÀNG TRỐNG (GIỐNG NHƯ API/SHEETS.JS) ***
+                if (role.RoleName && role.RoleName.trim() !== "") {
+                    rolesObj[role.RoleName.trim()] = role;
                 }
             });
             rolesDataCache = rolesObj;
@@ -125,6 +127,8 @@ export async function fetchSheetData(sheetName) {
             cacheTimestamp = now;
             return mechanicDataCache;
         }
+        
+        // (Nếu cần xử lý các sheet khác ở backend, thêm vào đây)
 
     } catch (error) {
         console.error(`Lỗi khi đọc sheet ${sheetName}:`, error);
@@ -182,7 +186,11 @@ export async function gameLoop(roomId) {
     const safePhaseTimes = {
         'NGÀY': phaseTimes['NGÀY'] || 120,
         'ĐÊM': phaseTimes['ĐÊM'] || 60,
-        'BIỂU QUYẾT': phaseTimes['BIỂU QUYẾT'] || 60
+        'BIỂU QUYẾT': phaseTimes['BIỂU QUYẾT'] || 60,
+        // Thêm các phase time khác nếu cần
+        'DAY_1_INTRO': 15,
+        'DAY_RESULT': 15,
+        'VOTE_RESULT': 15
     };
 
     switch (state.phase) {
@@ -201,7 +209,7 @@ export async function gameLoop(roomId) {
             await applyNightResults(roomId, results, state.nightNumber);
             
             // Thông báo kết quả
-            await setGamePhase(roomId, 'DAY_RESULT', 15, state.nightNumber);
+            await setGamePhase(roomId, 'DAY_RESULT', safePhaseTimes['DAY_RESULT'], state.nightNumber);
             break;
 
         case 'DAY_RESULT':
@@ -221,7 +229,7 @@ export async function gameLoop(roomId) {
             await applyVoteResults(roomId, voteResults);
             
             // Thông báo kết quả vote
-            await setGamePhase(roomId, 'VOTE_RESULT', 15, state.nightNumber);
+            await setGamePhase(roomId, 'VOTE_RESULT', safePhaseTimes['VOTE_RESULT'], state.nightNumber);
             break;
 
         case 'VOTE_RESULT':
@@ -260,10 +268,12 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
     
     // Xóa hành động/vote của phase trước
     if (newPhase === 'NIGHT' && nightNumber > 0) {
-        await db.ref(`rooms/${roomId}/votes/${nightNumber-1}`).remove(); // Xóa vote ngày trước
+        // Giữ lại vote của ngày trước để xem
+        // await db.ref(`rooms/${roomId}/votes/${nightNumber-1}`).remove(); 
     }
     if (newPhase === 'VOTE' && nightNumber > 0) {
-         await db.ref(`rooms/${roomId}/nightActions/${nightNumber}`).remove(); // Xóa action đêm trước
+         // Giữ lại action đêm trước để xem
+         // await db.ref(`rooms/${roomId}/nightActions/${nightNumber}`).remove(); 
     }
 
     await db.ref(`rooms/${roomId}/gameState`).update(phaseData);
@@ -285,6 +295,11 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     const liveStatus = {};
     livingPlayerIds.forEach(pId => {
         const player = players[pId];
+        // *** SỬA LỖI: Đảm bảo roleName không rỗng ***
+        if (!player.roleName) {
+             console.error(`Player ${player.username} không có roleName!`);
+             return; // Bỏ qua người chơi này
+        }
         const role = allRolesData[player.roleName] || allRolesData['Dân thường'] || { Faction: 'Phe Dân', Passive: '0', Kind: 'empty' };
         
         liveStatus[pId] = {
@@ -313,12 +328,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         }
     });
 
+    // (Logic tính toán còn lại giữ nguyên, nó đã đúng)
+    
     // 2. Xử lý Sói Cắn (Xác định mục tiêu)
     const wolfVotes = {};
     let wolfBiteTargetId = null;
     
     livingPlayerIds
-        .filter(pId => liveStatus[pId].faction === wolfFaction)
+        .filter(pId => liveStatus[pId] && liveStatus[pId].faction === wolfFaction) // Thêm check liveStatus[pId]
         .forEach(wolfId => {
             const action = nightActions[wolfId]; // Sói dùng action chung, lưu ở ID của Sói
             if (action && action.targetId) {
@@ -345,6 +362,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     
     // --- Ưu tiên 1: Bảo vệ, Khóa, & Phản Soi (Freeze, Shield, Counteraudit) ---
     livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return; // Bỏ qua player lỗi
         const status = liveStatus[pId];
         const player = players[pId]; // Lấy thông tin player gốc
         if (!isActionActive(status, player.state, currentNightNumber)) return;
@@ -367,9 +385,9 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
     // --- Ưu tiên 2: Soi (Audit) ---
     livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        // Soi vẫn hoạt động khi bị 'freeze' nhưng trả KQ sai
         if (!isActionActive(status, player.state, currentNightNumber, true, true)) return; 
         
         const action = status.action;
@@ -379,13 +397,10 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.role.Kind === 'audit') {
             const targetStatus = liveStatus[targetId];
             let resultFaction = targetStatus.faction;
-            // Áp dụng counteraudit
             if (targetStatus.passive.counteraudit) {
-                if (targetFaction === wolfFaction) resultFaction = "Phe Dân";
-                else if (targetFaction === "Phe Dân") resultFaction = wolfFaction;
-                // Phe thứ ba giữ nguyên
+                if (resultFaction === wolfFaction) resultFaction = "Phe Dân";
+                else if (resultFaction === "Phe Dân") resultFaction = wolfFaction;
             }
-            // Nếu người soi bị 'freeze' (isDisabled)
             if (status.isDisabled) { 
                 resultFaction = "Phe Dân";
             }
@@ -395,6 +410,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
     // --- Ưu tiên 3: Gây sát thương & Nguyền (Kill, Killwolf, Assassin, Curse) ---
     livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
         if (!isActionActive(status, player.state, currentNightNumber) || status.isDisabled) return;
@@ -429,12 +445,12 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         }
 
         if (status.role.Kind === 'curse' && action.choice === 'curse') {
-            // Logic Sói Nguyền chỉ hoạt động nếu mục tiêu của nó là mục tiêu Sói cắn
-            if (targetId === wolfBiteTargetId) {
-                liveStatus[targetId].isCursed = true;
-                announcements.private[pId] = `Bạn đã chọn Nguyền rủa mục tiêu Sói cắn (${players[targetId].username}).`;
-            } else {
-                 announcements.private[pId] = `Bạn đã chọn Nguyền rủa, nhưng mục tiêu của bạn (${players[targetId].username}) không phải là mục tiêu Sói cắn.`;
+            if (wolfBiteTargetId && liveStatus[wolfBiteTargetId] && action.targetId === 'wolf_target') {
+                 // Sói Nguyền chọn 'Nguyền', và mục tiêu sói cắn tồn tại
+                 liveStatus[wolfBiteTargetId].isCursed = true;
+                 announcements.private[pId] = `Bạn đã chọn Nguyền rủa mục tiêu Sói cắn (${players[wolfBiteTargetId].username}).`;
+            } else if (action.targetId === 'wolf_target') {
+                 announcements.private[pId] = `Bạn đã chọn Nguyền rủa, nhưng Sói không cắn ai.`;
             }
         }
     });
@@ -450,15 +466,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
     // --- Ưu tiên 5: Cứu (Witch Save) ---
     livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (status.isDisabled) return; // Witch bị 'freeze' không thể dùng thuốc
+        if (status.isDisabled) return; 
         if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'save') return;
         
-        // Phù thủy chỉ dùng thuốc Cứu 1 lần
         if (status.state.witch_save_used) return;
-        // Kiểm tra ReSelect
-        if (!isActionActive(status, player.state, currentNightNumber, true, false)) return; // false = ko check reselect cho witch
+        if (!isActionActive(status, player.state, currentNightNumber, true, false)) return; 
 
         const targetId = status.action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
@@ -468,30 +483,28 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
         if (targetStatus.damage >= armor && !targetStatus.isProtected) {
             targetStatus.isSaved = true;
-            status.state.witch_save_used = true; // "nếu cứu thành công thì sẽ mất chức năng"
+            status.state.witch_save_used = true; 
             announcements.private[pId] = `Bạn đã cứu sống ${players[targetId].username} thành công. Bạn mất bình Cứu.`;
         } else {
-            // "nếu không thành công thì vẫn sẽ còn chức năng" -> Không làm gì cả
             announcements.private[pId] = `Bạn đã dùng thuốc Cứu cho ${players[targetId].username} nhưng họ không chết. Bạn vẫn còn bình Cứu.`;
         }
     });
 
     // --- Ưu tiên 6: Giết (Witch Kill) ---
     livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
         if (status.isDisabled) return;
         if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'kill') return;
 
-        // Phù thủy chỉ dùng thuốc Giết 1 lần
         if (status.state.witch_kill_used) return;
-        // Kiểm tra ReSelect
         if (!isActionActive(status, player.state, currentNightNumber, true, false)) return;
 
         const targetId = status.action.targetId;
         if (liveStatus[targetId]) {
             liveStatus[targetId].damage++;
-            status.state.witch_kill_used = true; // "khi đã chọn giết thì... vẫn mất chức năng"
+            status.state.witch_kill_used = true; 
             announcements.private[pId] = `Bạn đã dùng thuốc Giết lên ${players[targetId].username}. Bạn mất bình Giết.`;
         }
     });
@@ -504,6 +517,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     };
 
     livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
         
@@ -515,8 +529,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.state.witch_save_used) newState.witch_save_used = true;
         if (status.state.witch_kill_used) newState.witch_kill_used = true;
 
-        // Cập nhật số lần dùng (Active)
-        if (status.action && isActionActive(status, player.state, currentNightNumber, false)) { // false = ko check reselect
+        if (status.action && isActionActive(status, player.state, currentNightNumber, false)) { 
             const activeRule = status.role.Active;
             if (activeRule !== 'n' && activeRule !== '0') {
                 const activeLeft = (parseInt(newState.activeLeft ?? activeRule)) - 1;
@@ -524,7 +537,6 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             }
         }
         
-        // Cập nhật mục tiêu cuối (ReSelect)
         if (status.action && status.action.targetId) {
             newState.lastTargetId = status.action.targetId;
         }
@@ -532,14 +544,11 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         
         // B. Xử lý Chết
         if (status.damage > 0 && !status.isProtected && !status.isSaved) {
-            // Xử lý giáp
             if (status.passive.armor && status.passive.armor > 1) {
-                // Trừ 1 giáp, không chết
                 nightResults.stateUpdates[pId].armorLeft = status.passive.armor - 1;
                 announcements.private[pId] = (announcements.private[pId] || "") + " Bạn đã bị tấn công nhưng Giáp đã đỡ."
             } else {
-                // Chết
-                status.isAlive = false; // Cập nhật trạng thái tạm thời để kiểm tra thắng
+                status.isAlive = false; 
                 nightResults.deaths.push({
                     id: pId,
                     username: player.username,
@@ -587,35 +596,28 @@ function isActionActive(status, playerState, currentNightNumber, checkReSelect =
     const state = playerState; // Dùng state gốc từ DB
     const action = status.action;
 
-    // Không có hành động
     if (!action) return false;
-    
-    // Bị 'freeze'
     if (!allowWhenDisabled && status.isDisabled) return false; 
 
-    // 1. Check Night
     if (role.Night !== 'n' && parseInt(role.Night) > currentNightNumber) {
-        return false; // Chưa đến đêm được phép
+        return false; 
     }
 
-    // 2. Check Active
-    if (role.Active === '0') return false; // Vai trò bị động (sẽ không có action)
+    if (role.Active === '0') return false; 
     if (role.Active !== 'n') {
         const activeLeft = parseInt(state.activeLeft ?? role.Active);
-        if (activeLeft <= 0) return false; // Hết lần dùng
+        if (activeLeft <= 0) return false; 
     }
   
-    // 3. Check ReSelect
     if (checkReSelect) {
         const reselectDisabled = (role.ReSelect === '0');
         if (reselectDisabled) {
            if (state.lastTargetId === action.targetId) {
-               return false; // Không được chọn lại
+               return false; 
            }
         }
     }
     
-    // 4. Logic riêng (Witch)
     if (role.Kind === 'witch') {
          if (action.choice === 'save' && state.witch_save_used) return false;
          if (action.choice === 'kill' && state.witch_kill_used) return false;
@@ -648,21 +650,17 @@ async function applyNightResults(roomId, results, nightNumber) {
         updates[`/players/${change.playerId}/roleName`] = change.newRoleName;
         updates[`/players/${change.playerId}/originalRoleName`] = change.oldRoleName; // Lưu vai trò cũ
         updates[`/players/${change.playerId}/faction`] = change.newFaction;
-        // Reset state cũ
         updates[`/players/${change.playerId}/state`] = {}; 
     });
 
     // 4. Ghi thông báo
-    // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
     const timestamp = ServerValue.TIMESTAMP;
-    // Thông báo công khai
     updates[`/publicData/latestAnnouncement`] = {
         message: results.announcements.public.join(' '),
         night: nightNumber,
         type: 'night_result',
         timestamp: timestamp
     };
-    // Thông báo riêng
     for (const pId in results.announcements.private) {
         updates[`/privateData/${pId}/night_${nightNumber}`] = {
              message: results.announcements.private[pId],
@@ -679,26 +677,23 @@ async function applyNightResults(roomId, results, nightNumber) {
 function calculateVoteResults(players, votes) {
     const livingPlayerIds = Object.keys(players).filter(pId => players[pId].isAlive);
     const voteCounts = { 'skip_vote': 0 };
-    livingPlayerIds.forEach(pId => voteCounts[pId] = 0); // Khởi tạo phiếu cho tất cả người sống
+    livingPlayerIds.forEach(pId => voteCounts[pId] = 0); 
 
-    // Đếm phiếu
     livingPlayerIds.forEach(voterId => {
-        const targetId = votes[voterId]; // votes[voterId] là targetId
+        const targetId = votes[voterId]; 
         if (targetId && voteCounts.hasOwnProperty(targetId)) {
             voteCounts[targetId]++;
         } else {
-            voteCounts['skip_vote']++; // Không vote hoặc vote không hợp lệ = skip
+            voteCounts['skip_vote']++; 
         }
     });
 
-    // Tìm phiếu cao nhất
     let maxVotes = 0;
     let mostVotedPlayerId = null;
     let isTied = false;
 
     for (const targetId in voteCounts) {
         if (targetId === 'skip_vote') continue;
-
         const count = voteCounts[targetId];
         if (count > maxVotes) {
             maxVotes = count;
@@ -709,7 +704,6 @@ function calculateVoteResults(players, votes) {
         }
     }
 
-    // So sánh với phiếu bỏ qua (theo luật của bạn)
     if (maxVotes === 0 || voteCounts['skip_vote'] >= maxVotes || isTied) {
         return { executedPlayerId: null, announcement: "Biểu quyết thất bại. Không có ai bị treo cổ." };
     }
@@ -736,7 +730,6 @@ async function applyVoteResults(roomId, results) {
     updates[`/publicData/latestAnnouncement`] = {
         message: results.announcement,
         type: 'vote_result',
-        // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
         timestamp: ServerValue.TIMESTAMP
     };
 
@@ -749,7 +742,6 @@ async function applyVoteResults(roomId, results) {
  */
 async function checkWinCondition(roomId) {
     const db = getDatabase(getFirebaseAdmin());
-    // Phải đọc lại dữ liệu players mới nhất (sau khi đã applyVoteResults)
     const playersSnapshot = await db.ref(`rooms/${roomId}/players`).once('value');
     const players = playersSnapshot.val();
 
@@ -770,11 +762,9 @@ async function checkWinCondition(roomId) {
     });
 
     if (wolfCount === 0) {
-        // Phe Dân (và Phe thứ ba nếu có) thắng
         return { isEnd: true, winner: "Phe Dân" };
     }
     if (wolfCount >= (villagerCount + thirdPartyCount)) {
-        // Bầy Sói thắng
         return { isEnd: true, winner: "Bầy Sói" };
     }
     
@@ -793,7 +783,6 @@ async function announceWinner(roomId, winnerFaction) {
      await db.ref(`rooms/${roomId}/publicData/latestAnnouncement`).set({
          message: message,
          type: 'game_end',
-         // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
          timestamp: ServerValue.TIMESTAMP
      });
 }

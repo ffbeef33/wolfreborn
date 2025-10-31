@@ -71,7 +71,7 @@ export default async function handler(request, response) {
             }
 
             if (sheetName === 'Favor Deck') {
-                // Logic xử lý Favor Deck (giữ nguyên từ file cũ của bạn)
+                // (Giữ nguyên logic Favor Deck)
                 const decks = [];
                 const deckNames = rows[0] || [];
                 const playerCounts = rows[2] || []; // Giả sử dòng 3 là player count
@@ -97,20 +97,19 @@ export default async function handler(request, response) {
             }
 
              if (sheetName === 'Mechanic') {
-                // Logic xử lý sheet Mechanic (cột A là tên phase, cột B là thời gian)
+                // (Giữ nguyên logic Mechanic)
                 const mechanicData = {};
-                // Bỏ qua hàng tiêu đề (hàng 1)
                 for (let i = 1; i < rows.length; i++) {
                     const row = rows[i];
                     if (row && row[0] && row[1]) {
-                        const phaseName = row[0].toUpperCase(); // Ví dụ: 'NGÀY', 'ĐÊM', 'BIỂU QUYẾT'
+                        const phaseName = row[0].toUpperCase(); 
                         const timeInSeconds = parseInt(row[1]);
                         if (!isNaN(timeInSeconds)) {
                             mechanicData[phaseName] = timeInSeconds;
                         }
                     }
                 }
-                 return response.status(200).json(mechanicData); // Trả về dạng object { 'NGÀY': 120, ... }
+                 return response.status(200).json(mechanicData); 
              }
 
 
@@ -119,10 +118,21 @@ export default async function handler(request, response) {
             const data = rows.slice(1).map(row => { // Bỏ qua hàng tiêu đề
                 let obj = {};
                 headers.forEach((header, index) => {
-                    // Xử lý giá trị rỗng/undefined thành chuỗi rỗng
                     obj[header] = (row && row[index] !== undefined && row[index] !== null) ? String(row[index]) : '';
                 });
                 return obj;
+            })
+            // *** SỬA LỖI: LỌC CÁC HÀNG TRỐNG TRƯỚC KHI GỬI VỀ CLIENT ***
+            .filter(obj => {
+                // Đối với sheet 'Roles', chỉ giữ lại nếu có RoleName
+                if (sheetName === 'Roles') {
+                    return obj.RoleName && obj.RoleName.trim() !== "";
+                }
+                // Đối với sheet 'Players', chỉ giữ lại nếu có Username
+                if (sheetName === 'Players') {
+                    return obj.Username && obj.Username.trim() !== "";
+                }
+                return true; // Giữ lại các sheet khác
             });
 
             return response.status(200).json(data);
@@ -150,44 +160,36 @@ export default async function handler(request, response) {
             const gameLogSheetName = 'GameLog'; // Tên sheet log
 
             if (action === 'saveGameLog') {
+                // (Giữ nguyên logic saveGameLog)
                 if (!payload || !Array.isArray(payload) || payload.length === 0) {
                     return response.status(400).json({ error: 'Invalid payload for saveGameLog.' });
                 }
-
-                // Chuyển đổi payload thành dạng [[role, name], [role, name], ...]
                 const values = payload.map(item => [(item.role || ''), (item.name || '')]);
-
-                // Xóa dữ liệu cũ trước khi ghi mới
                 await sheets.spreadsheets.values.clear({
                     spreadsheetId,
-                    range: `${gameLogSheetName}!A2:B`, // Xóa từ hàng 2 trở đi
+                    range: `${gameLogSheetName}!A2:B`, 
                 });
-
-                // Ghi dữ liệu mới vào
                 await sheets.spreadsheets.values.append({
                     spreadsheetId,
-                    range: `${gameLogSheetName}!A2`, // Bắt đầu ghi từ A2
+                    range: `${gameLogSheetName}!A2`, 
                     valueInputOption: 'USER_ENTERED',
                     insertDataOption: 'INSERT_ROWS',
                     requestBody: {
                         values,
                     },
                 });
-
                 return response.status(200).json({ success: true, message: 'Game log saved successfully.' });
             }
 
             if (action === 'clearGameLog') {
-                // Chỉ xóa dữ liệu log, không xóa tiêu đề
+                // (Giữ nguyên logic clearGameLog)
                 await sheets.spreadsheets.values.clear({
                     spreadsheetId,
-                    range: `${gameLogSheetName}!A2:B`, // Xóa từ hàng 2 trở đi
+                    range: `${gameLogSheetName}!A2:B`, 
                 });
-
                 return response.status(200).json({ success: true, message: 'Game log cleared successfully.' });
             }
 
-            // Hành động POST không hợp lệ
             return response.status(400).json({ error: 'Invalid action specified for POST request.' });
 
         } catch (error) {
