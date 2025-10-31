@@ -136,14 +136,35 @@ document.addEventListener('DOMContentLoaded', () => {
         // Lấy dữ liệu vai trò 1 lần
         try {
             const response = await fetch('/api/sheets?sheetName=Roles');
+            
+            // *** SỬA LỖI 1: Thêm kiểm tra response.ok ***
+            if (!response.ok) {
+                throw new Error(`API /api/sheets trả về lỗi ${response.status}`);
+            }
+            
             const rolesArray = await response.json();
+            
+            if (!rolesArray) {
+                 throw new Error("API /api/sheets không trả về dữ liệu.");
+            }
+
             allRolesData = rolesArray.reduce((acc, role) => {
-                acc[role.RoleName] = role;
+                // *** SỬA LỖI 2: Thêm kiểm tra 'role.RoleName' ***
+                // Bỏ qua các hàng trống trong Google Sheet có 'RoleName' là rỗng
+                if (role && role.RoleName) {
+                    acc[role.RoleName] = role;
+                }
                 return acc;
             }, {});
+
+            // Thêm kiểm tra nếu allRolesData vẫn rỗng (ví dụ sheet sai)
+            if (Object.keys(allRolesData).length === 0) {
+                 throw new Error("Không có dữ liệu vai trò nào được tải (allRolesData rỗng).");
+            }
+            
         } catch (e) {
             console.error("Lỗi tải dữ liệu Roles:", e);
-            alert("Lỗi nghiêm trọng: Không thể tải dữ liệu vai trò từ Google Sheets.");
+            alert(`Lỗi nghiêm trọng: Không thể tải dữ liệu vai trò từ Google Sheets.\nChi tiết: ${e.message}\nVui lòng kiểm tra API, biến môi trường và Google Sheets.`);
             return;
         }
 

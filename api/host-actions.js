@@ -46,7 +46,8 @@ export default async function handler(request, response) {
         return response.status(405).json({ success: false, message: 'Method Not Allowed' });
     }
 
-    const { action, username, roomId, password, isPrivate, playerId, roles } = request.body;
+    // Tách 'roles' ra khỏi đây vì nó không còn được dùng từ body
+    const { action, username, roomId, password, isPrivate, playerId } = request.body;
 
     try {
         const db = getDatabase(getFirebaseAdmin());
@@ -128,17 +129,26 @@ export default async function handler(request, response) {
 
             // === HÀNH ĐỘNG CỦA HOST (CẦN XÁC THỰC) ===
             default: {
+                // *** BẮT ĐẦU SỬA LỖI 400 ***
+                
                 // Xác thực Host
                 const roomRef = db.ref(`rooms/${roomId}`);
-                const hostIdSnapshot = await roomRef.child('hostId').once('value');
-                const hostId = hostIdSnapshot.val();
+                // Đọc toàn bộ roomData thay vì chỉ đọc lẻ tẻ
+                const roomSnapshot = await roomRef.once('value'); 
+                if (!roomSnapshot.exists()) {
+                    throw new Error('Phòng không tồn tại.');
+                }
+                const roomData = roomSnapshot.val();
+                
+                const hostId = roomData.hostId;
+                const players = roomData.players || {};
+                const gameSettings = roomData.gameSettings || {}; // Lấy gameSettings
                 
                 // Tìm player có username trùng
-                const playersSnapshot = await roomRef.child('players').once('value');
-                const players = playersSnapshot.val() || {};
                 const matchingPlayerId = Object.keys(players).find(pId => players[pId].username === username);
 
                 if (!matchingPlayerId || matchingPlayerId !== hostId) {
+                // *** KẾT THÚC SỬA LỖI 400 ***
                     throw new Error('Bạn không phải Host, không có quyền thực hiện hành động này.');
                 }
 
@@ -151,8 +161,12 @@ export default async function handler(request, response) {
                         return response.status(200).json({ success: true, message: 'Đã kick người chơi.' });
 
                     case 'start-game':
-                        // Lấy gameSettings từ body (do player.js gửi lên)
-                        await handleStartGame(db, roomId, players, roles); // 'players' từ snapshot, 'roles' từ body
+                        // *** BẮT ĐẦU SỬA LỖI 400 ***
+                        // Lấy roles từ gameSettings đã đọc, không phải từ request.body
+                        const rolesFromSettings = gameSettings.roles || []; 
+                        // Truyền rolesFromSettings thay vì 'roles' (không tồn tại)
+                        await handleStartGame(db, roomId, players, rolesFromSettings); 
+                        // *** KẾT THÚC SỬA LỖI 400 ***
                         return response.status(200).json({ success: true, message: 'Game đã bắt đầu.' });
                         
                     case 'skip-phase':
