@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Lấy dữ liệu vai trò 1 lần
         try {
-            const response = await fetch('/api/sheets?sheetName=Roles');
+            const response = await fetch('/api/sheets?sheetName=Roles&v=1');
             
             if (!response.ok) {
                 const errText = await response.text();
