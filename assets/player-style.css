@@ -673,3 +673,24 @@ button.btn-danger:hover:not(:disabled) {
     padding-top: 15px;
     border-top: 1px solid var(--border-color);
 }
+
+
+/* *** BẮT ĐẦU CSS MỚI: Thêm Timer cho Phase Đêm *** */
+.night-timer-display {
+    text-align: center;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+.night-timer-display h2 {
+    color: var(--text-color);
+    margin: 0 0 5px 0;
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+}
+.night-timer-display .timer {
+    font-size: 1.1rem;
+    color: var(--light-text);
+    margin: 0;
+}
+/* *** KẾT THÚC CSS MỚI *** */

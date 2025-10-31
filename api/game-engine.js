@@ -117,9 +117,11 @@ export async function fetchSheetData(sheetName) {
         if (sheetName === 'Mechanic') {
             const mechanicObj = {};
             data.forEach(row => {
-                const phase = row[0]?.toUpperCase();
+                // *** SỬA LỖI: Đảm bảo đọc đúng tên Phase (viết hoa) ***
+                const phase = row[0]?.toUpperCase().trim(); 
                 const time = parseInt(row[1], 10);
                 if (phase && !isNaN(time)) {
+                    // Lưu chính xác tên key từ sheet (NGÀY, ĐÊM, BIỂU QUYẾT)
                     mechanicObj[phase] = time;
                 }
             });
@@ -127,8 +129,6 @@ export async function fetchSheetData(sheetName) {
             cacheTimestamp = now;
             return mechanicDataCache;
         }
-        
-        // (Nếu cần xử lý các sheet khác ở backend, thêm vào đây)
 
     } catch (error) {
         console.error(`Lỗi khi đọc sheet ${sheetName}:`, error);
@@ -182,16 +182,19 @@ export async function gameLoop(roomId) {
     const allRolesData = await fetchSheetData('Roles');
     const phaseTimes = await fetchSheetData('Mechanic');
 
-    // Mặc định thời gian nếu sheet lỗi
+    // *** BẮT ĐẦU SỬA LỖI: Cập nhật logic đọc thời gian ***
+    // Đảm bảo key khớp với Google Sheet (viết hoa)
     const safePhaseTimes = {
-        'NGÀY': phaseTimes['NGÀY'] || 120,
-        'ĐÊM': phaseTimes['ĐÊM'] || 60,
+        'NGÀY': phaseTimes['NGÀY'] || 180,
+        'ĐÊM': phaseTimes['ĐÊM'] || 90, // Cập nhật fallback khớp sheet
         'BIỂU QUYẾT': phaseTimes['BIỂU QUYẾT'] || 60,
-        // Thêm các phase time khác nếu cần
-        'DAY_1_INTRO': 15,
-        'DAY_RESULT': 15,
-        'VOTE_RESULT': 15
+        
+        // Thêm các phase phụ (Nên thêm vào sheet "Mechanic" của bạn)
+        'DAY_1_INTRO': phaseTimes['DAY_1_INTRO'] || 15,
+        'DAY_RESULT': phaseTimes['DAY_RESULT'] || 15,
+        'VOTE_RESULT': phaseTimes['VOTE_RESULT'] || 15
     };
+    // *** KẾT THÚC SỬA LỖI ***
 
     switch (state.phase) {
         
@@ -213,12 +216,12 @@ export async function gameLoop(roomId) {
             break;
 
         case 'DAY_RESULT':
-            // Hết giờ thông báo, sang Thảo luận
+            // Hết giờ thông báo, sang Thảo luận ('NGÀY')
             await setGamePhase(roomId, 'DAY_DISCUSS', safePhaseTimes['NGÀY'], state.nightNumber);
             break;
 
         case 'DAY_DISCUSS':
-            // Hết giờ thảo luận, chuyển sang Biểu Quyết
+            // Hết giờ thảo luận, chuyển sang Biểu Quyết ('BIỂU QUYẾT')
             await setGamePhase(roomId, 'VOTE', safePhaseTimes['BIỂU QUYẾT'], state.nightNumber);
             break;
 
@@ -268,12 +271,10 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
     
     // Xóa hành động/vote của phase trước
     if (newPhase === 'NIGHT' && nightNumber > 0) {
-        // Giữ lại vote của ngày trước để xem
-        // await db.ref(`rooms/${roomId}/votes/${nightNumber-1}`).remove(); 
+        // await db.ref(`rooms/${roomId}/votes/${nightNumber-1}`).remove(); // Xóa vote ngày trước
     }
     if (newPhase === 'VOTE' && nightNumber > 0) {
-         // Giữ lại action đêm trước để xem
-         // await db.ref(`rooms/${roomId}/nightActions/${nightNumber}`).remove(); 
+         // await db.ref(`rooms/${roomId}/nightActions/${nightNumber}`).remove(); // Xóa action đêm trước
     }
 
     await db.ref(`rooms/${roomId}/gameState`).update(phaseData);
@@ -328,8 +329,6 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         }
     });
 
-    // (Logic tính toán còn lại giữ nguyên, nó đã đúng)
-    
     // 2. Xử lý Sói Cắn (Xác định mục tiêu)
     const wolfVotes = {};
     let wolfBiteTargetId = null;
@@ -417,7 +416,9 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
         const action = status.action;
         const targetId = action.targetId;
-        if (!targetId || !liveStatus[targetId]) return;
+        
+        // Sói nguyền (curse) không cần targetId
+        if (status.role.Kind !== 'curse' && (!targetId || !liveStatus[targetId])) return;
 
         if (status.role.Kind === 'kill') {
             liveStatus[targetId].damage++;
@@ -654,13 +655,16 @@ async function applyNightResults(roomId, results, nightNumber) {
     });
 
     // 4. Ghi thông báo
+    // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
     const timestamp = ServerValue.TIMESTAMP;
+    // Thông báo công khai
     updates[`/publicData/latestAnnouncement`] = {
         message: results.announcements.public.join(' '),
         night: nightNumber,
         type: 'night_result',
         timestamp: timestamp
     };
+    // Thông báo riêng
     for (const pId in results.announcements.private) {
         updates[`/privateData/${pId}/night_${nightNumber}`] = {
              message: results.announcements.private[pId],
@@ -677,23 +681,26 @@ async function applyNightResults(roomId, results, nightNumber) {
 function calculateVoteResults(players, votes) {
     const livingPlayerIds = Object.keys(players).filter(pId => players[pId].isAlive);
     const voteCounts = { 'skip_vote': 0 };
-    livingPlayerIds.forEach(pId => voteCounts[pId] = 0); 
+    livingPlayerIds.forEach(pId => voteCounts[pId] = 0); // Khởi tạo phiếu cho tất cả người sống
 
+    // Đếm phiếu
     livingPlayerIds.forEach(voterId => {
-        const targetId = votes[voterId]; 
+        const targetId = votes[voterId]; // votes[voterId] là targetId
         if (targetId && voteCounts.hasOwnProperty(targetId)) {
             voteCounts[targetId]++;
         } else {
-            voteCounts['skip_vote']++; 
+            voteCounts['skip_vote']++; // Không vote hoặc vote không hợp lệ = skip
         }
     });
 
+    // Tìm phiếu cao nhất
     let maxVotes = 0;
     let mostVotedPlayerId = null;
     let isTied = false;
 
     for (const targetId in voteCounts) {
         if (targetId === 'skip_vote') continue;
+
         const count = voteCounts[targetId];
         if (count > maxVotes) {
             maxVotes = count;
@@ -704,6 +711,7 @@ function calculateVoteResults(players, votes) {
         }
     }
 
+    // So sánh với phiếu bỏ qua (theo luật của bạn)
     if (maxVotes === 0 || voteCounts['skip_vote'] >= maxVotes || isTied) {
         return { executedPlayerId: null, announcement: "Biểu quyết thất bại. Không có ai bị treo cổ." };
     }
@@ -730,6 +738,7 @@ async function applyVoteResults(roomId, results) {
     updates[`/publicData/latestAnnouncement`] = {
         message: results.announcement,
         type: 'vote_result',
+        // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
         timestamp: ServerValue.TIMESTAMP
     };
 
@@ -742,6 +751,7 @@ async function applyVoteResults(roomId, results) {
  */
 async function checkWinCondition(roomId) {
     const db = getDatabase(getFirebaseAdmin());
+    // Phải đọc lại dữ liệu players mới nhất (sau khi đã applyVoteResults)
     const playersSnapshot = await db.ref(`rooms/${roomId}/players`).once('value');
     const players = playersSnapshot.val();
 
@@ -762,9 +772,11 @@ async function checkWinCondition(roomId) {
     });
 
     if (wolfCount === 0) {
+        // Phe Dân (và Phe thứ ba nếu có) thắng
         return { isEnd: true, winner: "Phe Dân" };
     }
     if (wolfCount >= (villagerCount + thirdPartyCount)) {
+        // Bầy Sói thắng
         return { isEnd: true, winner: "Bầy Sói" };
     }
     
@@ -783,6 +795,7 @@ async function announceWinner(roomId, winnerFaction) {
      await db.ref(`rooms/${roomId}/publicData/latestAnnouncement`).set({
          message: message,
          type: 'game_end',
+         // *** ĐÃ SỬA LỖI 1: Dùng ServerValue ***
          timestamp: ServerValue.TIMESTAMP
      });
 }
