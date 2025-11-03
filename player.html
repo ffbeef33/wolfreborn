@@ -178,28 +178,5 @@
 
     <script src="player.js"></script>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var username = sessionStorage.getItem('mywolf_username');
-        var lobbyContainer = document.getElementById('lobby-container');
-        var gameDashboard = document.getElementById('game-dashboard-container');
-        var currentRoomId = sessionStorage.getItem('mywolf_roomid');
-
-        if (username) {
-            if (currentRoomId) {
-                // Nếu có phòng, ẨN lobby và HIỆN game
-                // player.js sẽ gọi showGameRoom() để xử lý việc này
-            } else {
-                // Nếu không có phòng, HIỆN lobby và ẨN game
-                lobbyContainer.classList.remove('hidden');
-                gameDashboard.classList.add('hidden');
-                document.getElementById('lobby-player-name').textContent = username;
-            }
-        } else {
-            // Không đăng nhập, quay về index
-            window.location.href = 'index.html'; 
-        }
-    });
-    </script>
-</body>
+    </body>
 </html>

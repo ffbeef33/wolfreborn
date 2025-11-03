@@ -27,7 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let hasTriggeredLoop = false;
 
     // --- 3. BIẾN DOM (Sẽ được gán trong initialize) ---
-    // *** BẮT ĐẦU SỬA LỖI: Di chuyển tất cả biến DOM vào hàm initialize ***
     let lobbyContainer, lobbyPlayerName, createRoomBtn, createRoomOptions,
         roomPrivateCheckbox, roomPasswordInput, confirmCreateRoomBtn, createRoomError,
         roomList, joinPasswordSection, joinPasswordInput, confirmJoinRoomBtn, joinRoomError,
@@ -120,8 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         publishedWillModal = getEl('published-will-modal');
         announcementModal = getEl('announcement-modal');
     }
-    // *** KẾT THÚC SỬA LỖI ***
-
 
     // --- 3. ÁNH XẠ KIND MỚI (Cho UI) ---
     const KIND_UI_MAP = {
@@ -152,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Lấy dữ liệu vai trò 1 lần
+        // 1. Tải dữ liệu Roles TRƯỚC
         try {
             // Thêm cache-busting (phá cache) để luôn lấy dữ liệu mới
             const response = await fetch('/api/sheets?sheetName=Roles&t=' + Date.now());
@@ -185,44 +182,50 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // Dừng thực thi
         }
 
-        // *** BẮT ĐẦU SỬA LỖI: Gán DOM sau khi biết giao diện ***
-        // Gán tất cả các biến DOM ngay tại đây
-        assignDomElements();
-        // *** KẾT THÚC SỬA LỖI ***
+        // 2. Gán các container chính
+        lobbyContainer = getEl('lobby-container');
+        gameDashboard = getEl('game-dashboard-container');
 
-        // Kiểm tra xem người chơi có đang ở trong phòng nào không
+        // 3. Quyết định UI
         currentRoomId = sessionStorage.getItem('mywolf_roomid');
         if (currentRoomId) {
-            // Nếu có, thử vào thẳng phòng
-            showGameRoom(); 
-            attachMainRoomListener(currentRoomId);
-            attachChatListeners(currentRoomId);
+            showGameRoom(); // Hiển thị UI Game
         } else {
-            // Nếu không, hiển thị sảnh chờ
-            showLobby(); 
+            showLobby(); // Hiển thị UI Lobby
         }
 
-        // Gắn listener chung
+        // 4. GÁN TẤT CẢ DOM (Bây giờ chúng đã an toàn)
+        assignDomElements();
+
+        // 5. Gắn các listener
         attachCommonListeners();
+        
+        if (currentRoomId) {
+            // Đã ở trong phòng, gắn listener game
+            attachMainRoomListener(currentRoomId);
+            attachChatListeners(currentRoomId);
+            playerNameDisplay.textContent = myUsername; // Cập nhật tên
+        } else {
+            // Đang ở sảnh, tải danh sách phòng
+            lobbyPlayerName.textContent = myUsername; // Cập nhật tên
+            fetchRoomList();
+        }
     }
 
     /**
-     * Hiển thị sảnh chờ và tải danh sách phòng
+     * Hiển thị sảnh chờ (Chỉ đổi class)
      */
     function showLobby() {
         lobbyContainer.classList.remove('hidden');
         gameDashboard.classList.add('hidden');
-        lobbyPlayerName.textContent = myUsername;
-        fetchRoomList();
     }
 
     /**
-     * Hiển thị phòng game
+     * Hiển thị phòng game (Chỉ đổi class)
      */
     function showGameRoom() {
         lobbyContainer.classList.add('hidden');
         gameDashboard.classList.remove('hidden');
-        playerNameDisplay.textContent = myUsername;
     }
 
     /**
@@ -272,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
         hostRestartGameBtn.addEventListener('click', () => handleHostAction('restart-game'));
 
         // Xử lý chọn vai trò (Host)
-        // Kiểm tra roleSelectionGrid có tồn tại không
         if (roleSelectionGrid) {
             roleSelectionGrid.addEventListener('change', updateRoleSelectionCount);
         }
@@ -355,9 +357,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(data.message || 'Lỗi khi tạo phòng');
 
             sessionStorage.setItem('mywolf_roomid', data.roomId);
-            showGameRoom();
-            attachMainRoomListener(data.roomId);
-            attachChatListeners(data.roomId);
+            
+            // Tải lại trang (cách dễ nhất để vào trạng thái "Game" và gán DOM đúng)
+            window.location.reload();
 
         } catch (e) {
             createRoomError.textContent = e.message;
@@ -409,9 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(data.message || 'Lỗi khi vào phòng');
             
             sessionStorage.setItem('mywolf_roomid', selectedRoomToJoin);
-            showGameRoom();
-            attachMainRoomListener(selectedRoomToJoin);
-            attachChatListeners(selectedRoomToJoin);
+            
+            // Tải lại trang
+            window.location.reload();
 
         } catch (e) {
             joinRoomError.textContent = e.message;
@@ -446,8 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!roomData) {
                 alert("Phòng đã bị xóa bởi Host.");
                 sessionStorage.removeItem('mywolf_roomid');
-                cleanupListeners();
-                showLobby();
+                window.location.reload(); // Tải lại về sảnh
                 return;
             }
 
@@ -455,8 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!myPlayerId) {
                 alert("Bạn đã bị kick khỏi phòng.");
                 sessionStorage.removeItem('mywolf_roomid');
-                cleanupListeners();
-                showLobby();
+                window.location.reload(); // Tải lại về sảnh
                 return;
             }
             
@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Lỗi listener:", error);
             alert("Mất kết nối với phòng game.");
             sessionStorage.removeItem('mywolf_roomid');
-            showLobby();
+            window.location.reload(); // Tải lại về sảnh
         });
     }
 
@@ -533,7 +533,6 @@ document.addEventListener('DOMContentLoaded', () => {
             hostGameplayControls.classList.add('hidden');
             hostDeleteRoomBtn.classList.remove('hidden'); 
             
-            // *** SỬA LỖI: Kiểm tra null trước khi truy cập hasChildNodes ***
             if (roleSelectionGrid && !roleSelectionGrid.hasChildNodes() && Object.keys(allRolesData).length > 0) {
                 renderRoleSelection();
             }
@@ -569,7 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
      * Render các checkbox chọn vai trò cho Host
      */
     function renderRoleSelection() {
-        // *** SỬA LỖI: Kiểm tra roleSelectionGrid có null không ***
         if (!roleSelectionGrid) {
             console.error("Lỗi: Không tìm thấy 'role-selection-grid' trong DOM.");
             return;
@@ -604,8 +602,6 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function updateRoleSelectionCount() {
         if (!isHost) return;
-
-        // *** SỬA LỖI: Kiểm tra roleSelectionGrid có null không ***
         if (!roleSelectionGrid) return; 
 
         const selectedRoles = [];
@@ -1418,8 +1414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (action === 'delete-room') {
                 alert("Đã xóa phòng.");
                 sessionStorage.removeItem('mywolf_roomid');
-                cleanupListeners();
-                showLobby();
+                window.location.reload();
             }
 
         } catch (e) {
