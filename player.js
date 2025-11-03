@@ -172,6 +172,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return acc;
             }, {});
 
+            // *** DÒNG THÊM 1 (DEBUG) ***
+            console.log('Dữ liệu allRolesData đã được xử lý:', allRolesData);
+
             if (Object.keys(allRolesData).length === 0) {
                  throw new Error("Không có dữ liệu vai trò nào được tải (allRolesData rỗng). Kiểm tra Google Sheet 'Roles'.");
             }
@@ -575,6 +578,10 @@ document.addEventListener('DOMContentLoaded', () => {
      * (Render TẤT CẢ vai trò, bao gồm Dân thường và Sói thường)
      */
     function renderRoleSelection() {
+        
+        // *** DÒNG THÊM 2 (DEBUG) ***
+        console.log('Đang chạy renderRoleSelection()... Dữ liệu:', allRolesData);
+
         if (!roleSelectionGrid) {
             console.error("Lỗi: Không tìm thấy 'role-selection-grid' trong DOM.");
             return;
@@ -590,6 +597,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!role.Faction) continue; // Vẫn giữ bộ lọc rác
             
+            // *** DÒNG THÊM 3 (DEBUG) ***
+            console.log('Đang thêm vai trò:', roleName, role);
+
             const div = document.createElement('div');
             div.className = 'role-selection-item'; 
             div.innerHTML = `
