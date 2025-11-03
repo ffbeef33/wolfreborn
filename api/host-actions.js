@@ -95,6 +95,18 @@ export default async function handler(request, response) {
                 }
                 const roomData = snapshot.val();
 
+                // --- *** BẮT ĐẦU SỬA ĐỔI LOGIC *** ---
+
+                // 1. Kiểm tra xem người chơi đã ở trong phòng (đang reconnect)
+                const playerExists = Object.values(roomData.players).some(p => p.username === username);
+
+                if (playerExists) {
+                    // Người chơi này đang kết nối lại (reconnecting).
+                    // Không cần kiểm tra phase hay mật khẩu, chỉ cần cho họ vào.
+                    return response.status(200).json({ success: true, roomId: roomId });
+                }
+
+                // 2. Nếu không, đây là người chơi MỚI. Áp dụng logic cũ.
                 if (roomData.gameState.phase !== 'waiting') {
                     throw new Error('Game đã bắt đầu, không thể tham gia.');
                 }
@@ -103,10 +115,7 @@ export default async function handler(request, response) {
                     throw new Error('Mật khẩu phòng không chính xác.');
                 }
 
-                const playerExists = Object.values(roomData.players).some(p => p.username === username);
-                if (playerExists) {
-                    throw new Error('Tên này đã có người sử dụng trong phòng.');
-                }
+                // (Không cần kiểm tra playerExists nữa vì đã kiểm tra ở trên)
 
                 const newPlayerId = `player_${Math.random().toString(36).substring(2, 9)}`;
                 await db.ref(`rooms/${roomId}/players/${newPlayerId}`).set({
@@ -117,6 +126,8 @@ export default async function handler(request, response) {
                 });
                 
                 return response.status(200).json({ success: true, roomId: roomId });
+                
+                // --- *** KẾT THÚC SỬA ĐỔI LOGIC *** ---
             }
 
             // === HÀNH ĐỘNG CỦA HOST (CẦN XÁC THỰC) ===

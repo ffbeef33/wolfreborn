@@ -143,7 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
      * Chạy khi tải trang
      */
     async function initialize() {
-        myUsername = sessionStorage.getItem('mywolf_username');
+        // *** SỬA ĐỔI TẠI ĐÂY ***
+        myUsername = localStorage.getItem('mywolf_username');
         if (!myUsername) {
             window.location.href = 'index.html'; // Quay về trang login nếu chưa đăng nhập
             return;
@@ -187,7 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gameDashboard = getEl('game-dashboard-container');
 
         // 3. Quyết định UI
-        currentRoomId = sessionStorage.getItem('mywolf_roomid');
+        // *** SỬA ĐỔI TẠI ĐÂY ***
+        currentRoomId = localStorage.getItem('mywolf_roomid');
         if (currentRoomId) {
             showGameRoom(); // Hiển thị UI Game
         } else {
@@ -356,7 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Lỗi khi tạo phòng');
 
-            sessionStorage.setItem('mywolf_roomid', data.roomId);
+            // *** SỬA ĐỔI TẠI ĐÂY ***
+            localStorage.setItem('mywolf_roomid', data.roomId);
             
             // Tải lại trang (cách dễ nhất để vào trạng thái "Game" và gán DOM đúng)
             window.location.reload();
@@ -410,7 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Lỗi khi vào phòng');
             
-            sessionStorage.setItem('mywolf_roomid', selectedRoomToJoin);
+            // *** SỬA ĐỔI TẠI ĐÂY ***
+            localStorage.setItem('mywolf_roomid', selectedRoomToJoin);
             
             // Tải lại trang
             window.location.reload();
@@ -447,7 +451,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!roomData) {
                 alert("Phòng đã bị xóa bởi Host.");
-                sessionStorage.removeItem('mywolf_roomid');
+                // *** SỬA ĐỔI TẠI ĐÂY ***
+                localStorage.removeItem('mywolf_roomid');
                 window.location.reload(); // Tải lại về sảnh
                 return;
             }
@@ -455,7 +460,8 @@ document.addEventListener('DOMContentLoaded', () => {
             myPlayerId = Object.keys(roomData.players).find(pId => roomData.players[pId].username === myUsername);
             if (!myPlayerId) {
                 alert("Bạn đã bị kick khỏi phòng.");
-                sessionStorage.removeItem('mywolf_roomid');
+                // *** SỬA ĐỔI TẠI ĐÂY ***
+                localStorage.removeItem('mywolf_roomid');
                 window.location.reload(); // Tải lại về sảnh
                 return;
             }
@@ -483,7 +489,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }, (error) => {
             console.error("Lỗi listener:", error);
             alert("Mất kết nối với phòng game.");
-            sessionStorage.removeItem('mywolf_roomid');
+            // *** SỬA ĐỔI TẠI ĐÂY ***
+            localStorage.removeItem('mywolf_roomid');
             window.location.reload(); // Tải lại về sảnh
         });
     }
@@ -681,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'waiting':
                 // (đã xử lý ở trên)
                 
-                // *** THÊM SỬA ĐỔI ***
+                // *** SỬA LỖI CHAT ***
                 // Xóa tin nhắn chat cũ khi quay về sảnh chờ
                 if (chatMessages) {
                     chatMessages.innerHTML = '';
@@ -1302,7 +1309,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- 8. LOGIC CHAT ---
+    // --- 8. LOGIC CHAT (Đã sửa lỗi) ---
     
     function attachChatListeners(roomId) {
         const channels = ['living', 'dead', 'wolves'];
@@ -1322,17 +1329,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // *** HÀM ĐÃ SỬA ***
     function displayChatMessage(message, channel) {
         // if (channel !== activeChatChannel) {
         //     return;
-        // } // <-- ĐÃ XÓA
+        // } // <-- Đã XÓA
         
         const msgEl = document.createElement('div');
         msgEl.className = 'message-item';
         msgEl.dataset.channel = channel;
         
-        // *** THÊM SỬA ĐỔI ***
         // Ẩn tin nhắn nếu nó không thuộc kênh đang hoạt động
         if (channel !== activeChatChannel) {
             msgEl.classList.add('hidden');
@@ -1362,16 +1367,14 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.value = '';
     }
     
-    // *** HÀM ĐÃ SỬA ***
     function switchChatChannel(newChannel) {
         activeChatChannel = newChannel;
         chatChannels.querySelectorAll('.channel-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.channel === newChannel);
         });
         
-        // chatMessages.innerHTML = ''; // <-- ĐÃ XÓA
+        // chatMessages.innerHTML = ''; // <-- Đã XÓA
         
-        // *** THÊM SỬA ĐỔI ***
         // Lặp qua tất cả tin nhắn và ẩn/hiện chúng
         if (chatMessages) {
              chatMessages.querySelectorAll('.message-item').forEach(msg => {
@@ -1436,7 +1439,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (action === 'delete-room') {
                 alert("Đã xóa phòng.");
-                sessionStorage.removeItem('mywolf_roomid');
+                // *** SỬA ĐỔI TẠI ĐÂY ***
+                localStorage.removeItem('mywolf_roomid');
                 window.location.reload();
             }
 

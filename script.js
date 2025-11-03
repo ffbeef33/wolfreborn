@@ -119,8 +119,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.username) {
-                // Lưu tên người dùng vào sessionStorage để player.html có thể lấy
-                sessionStorage.setItem('mywolf_username', data.username);
+                // *** SỬA ĐỔI TẠI ĐÂY ***
+                // Lưu tên người dùng vào localStorage để không bị mất khi đóng tab
+                localStorage.setItem('mywolf_username', data.username);
+                // *** KẾT THÚC SỬA ĐỔI ***
+                
                 // Chuyển hướng đến trang sảnh chờ/game
                 window.location.href = 'player.html';
             } else {
