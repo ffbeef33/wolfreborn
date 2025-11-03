@@ -151,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Tải dữ liệu Roles TRƯỚC
         try {
+            // Thêm cache-busting (phá cache) để luôn lấy dữ liệu mới
             const response = await fetch('/api/sheets?sheetName=Roles&t=' + Date.now());
             
             if (!response.ok) {
