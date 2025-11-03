@@ -178,19 +178,25 @@ export async function gameLoop(roomId) {
 
     // --- HẾT GIỜ: XỬ LÝ CHUYỂN PHASE ---
     
-    // Lấy luật chơi từ Sheets (sẽ dùng cache)
-    const allRolesData = await fetchSheetData('Roles');
-    
     // *** SỬA LỖI 500: BẮT ĐẦU ***
-    // Lấy thời gian phase một cách an toàn, không làm sập server
-    let phaseTimes = {};
+    // Bọc cả hai lệnh gọi trong try...catch
+    let allRolesData;
+    let phaseTimes;
+    
     try {
-        // Thử lấy dữ liệu từ Google Sheet
+        allRolesData = await fetchSheetData('Roles');
+    } catch (e) {
+        console.error(`!!! LỖI NGHIÊM TRỌNG KHI TẢI 'Roles' SHEET (Phòng ${roomId}):`, e.message);
+        // Ném lỗi này vì game không thể tiếp tục nếu không có vai trò
+        throw new Error(`Không thể tải dữ liệu 'Roles': ${e.message}`);
+    }
+
+    try {
         phaseTimes = await fetchSheetData('Mechanic');
     } catch (e) {
-        console.error(`!!! LỖI NGHIÊM TRỌNG KHI TẢI 'Mechanic' SHEET (Phòng ${roomId}):`, e.message);
+        console.error(`!!! LỖI KHI TẢI 'Mechanic' SHEET (Phòng ${roomId}):`, e.message);
         console.error("!!! Server sẽ dùng thời gian mặc định (fallback) để tiếp tục.");
-        // phaseTimes sẽ là một đối tượng rỗng {}, logic fallback bên dưới sẽ xử lý
+        phaseTimes = {}; // Dùng đối tượng rỗng để logic fallback bên dưới xử lý
     }
     // *** SỬA LỖI 500: KẾT THÚC ***
 
