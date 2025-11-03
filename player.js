@@ -533,7 +533,6 @@ document.addEventListener('DOMContentLoaded', () => {
             hostGameplayControls.classList.add('hidden');
             hostDeleteRoomBtn.classList.remove('hidden'); 
             
-            // *** ĐÃ SỬA LỖI TRƯỚC: (roleSelectionGrid.children.length === 0) ***
             if (roleSelectionGrid && roleSelectionGrid.children.length === 0 && Object.keys(allRolesData).length > 0) {
                 renderRoleSelection();
             }
@@ -705,14 +704,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
 
-            case 'DAY_RESULT':
-            case 'VOTE_RESULT':
+            // *** SỬA LỖI: Xóa bỏ các phase chờ ***
+            // case 'DAY_RESULT': (Đã xóa)
+            // case 'VOTE_RESULT': (Đã xóa)
+            
             case 'GAME_END':
                 phaseDisplaySection.classList.remove('hidden');
-                phaseTitle.textContent = "Kết Quả";
-                if (gameState.phase === 'GAME_END') {
-                    phaseTitle.textContent = "KẾT THÚC GAME";
-                }
+                phaseTitle.textContent = "KẾT THÚC GAME";
+                // Thông báo kết thúc game sẽ hiển thị trong private log
+                phaseMessage.textContent = "Vui lòng kiểm tra Nhật Ký Riêng để xem kết quả.";
+                phaseResults.innerHTML = '';
                 break;
 
             case 'DAY_DISCUSS':
@@ -844,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Chọn một mục tiêu để cả bầy cùng cắn.',
                 'wolf_bite'
             );
-            // *** SỬA LỖI: Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
+            // *** SỬA LỖI (TỰ CHỌN): Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
             renderTargetList(panel.content, 'wolf_bite', nightNum, 1, true, null); 
             interactiveActionSection.appendChild(panel.panel);
         }
@@ -875,7 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const panel = createActionPanel(uiInfo.title, uiInfo.description, kind);
                 const reselect = role.ReSelect === '1';
                 const quantity = role.Quantity === 'n' ? 99 : parseInt(role.Quantity);
-                // *** SỬA LỖI: Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
+                // *** SỬA LỖI (TỰ CHỌN): Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
                 renderTargetList(panel.content, kind, nightNum, quantity, reselect, null);
                 interactiveActionSection.appendChild(panel.panel);
                 break;
@@ -1118,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const players = roomData.players || {};
         
         Object.keys(players).forEach(pId => {
-            // *** SỬA LỖI: Đã xóa bộ lọc && pId !== myPlayerId ***
+            // *** SỬA LỖI (TỰ CHỌN): Đã xóa bộ lọc && pId !== myPlayerId ***
             if (players[pId].isAlive) { 
                 const card = document.createElement('div');
                 card.className = 'target-card';
@@ -1137,7 +1138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.addEventListener('click', () => {
                     if (card.classList.contains('disabled')) return;
                     
-                    // Lỗi logic nhỏ: phải tham chiếu đến targetGrid, không phải 'grid'
+                    // Lỗi logic nhỏ: phải tham chiếu đến targetGrid
                     targetGrid.querySelectorAll('.target-card').forEach(el => el.classList.remove('selected'));
                     content.querySelector('#assassin-guess-grid')?.remove();
                     
@@ -1502,28 +1503,70 @@ document.addEventListener('DOMContentLoaded', () => {
             announcementModal.classList.remove('hidden');
         }
         
-        if (phaseResults.closest('.game-card:not(.hidden)')) {
-             phaseResults.innerHTML = `<p>${data.message}</p>`;
-        }
+        // *** SỬA LỖI: Không hiển thị kết quả public ở đây nữa ***
+        // if (phaseResults.closest('.game-card:not(.hidden)')) {
+        //      phaseResults.innerHTML = `<p>${data.message}</p>`;
+        // }
     }
     
+    // *** HÀM QUAN TRỌNG: ĐÃ SỬA LỖI HIỂN THỊ LOG ***
     function updatePrivateLog(privateData) {
         privateLogSection.classList.remove('hidden');
         privateLogContent.innerHTML = '';
         
+        // Sắp xếp các key (ví dụ: night_1, day_1, night_2...)
         const sortedKeys = Object.keys(privateData).sort((a, b) => {
-            const nightA = parseInt(a.split('_')[1] || 0);
-            const nightB = parseInt(b.split('_')[1] || 0);
-            return nightA - nightB;
+            const [typeA, numA] = a.split('_');
+            const [typeB, numB] = b.split('_');
+
+            // Xử lý 'game_end' trước
+            if (typeA === 'game' && typeB !== 'game') return 1; // game_end luôn ở cuối
+            if (typeA !== 'game' && typeB === 'game') return -1; // game_end luôn ở cuối
+            if (typeA === 'game' && typeB === 'game') return 0;
+
+            const numberA = parseInt(numA || 0);
+            const numberB = parseInt(numB || 0);
+
+            // 1. Sắp xếp theo số (cũ nhất trước)
+            if (numberA !== numberB) {
+                return numberA - numberB;
+            }
+
+            // 2. Nếu cùng số, Đêm (night) diễn ra trước Ngày (day)
+            if (typeA === 'night' && typeB === 'day') {
+                return -1; 
+            }
+            if (typeA === 'day' && typeB === 'night') {
+                return 1;
+            }
+            return 0;
         });
         
+        // Lặp qua các key đã sắp xếp
         sortedKeys.forEach(key => {
             const data = privateData[key];
-            const nightNum = key.split('_')[1] || '?';
+            const [type, num] = key.split('_'); // [night, 1] hoặc [day, 1]
+            
+            let label = 'Sự kiện'; // Mặc định
+            
+            // *** SỬA LỖI 1: Hiển thị đúng Ngày/Đêm ***
+            if (type === 'night') {
+                label = `Đêm ${num}`;
+            } else if (type === 'day') {
+                label = `Ngày ${num}`;
+            } else if (type === 'game') {
+                label = 'Kết Thúc Game';
+            }
+            
             const p = document.createElement('p');
             p.className = 'log-entry';
-            p.innerHTML = `<strong>[Đêm ${nightNum}]</strong><br>${data.message}`;
-            privateLogContent.appendChild(p);
+            // Sử dụng .innerText để tránh lỗi XSS và hiển thị xuống dòng (từ \n)
+            p.innerHTML = `<strong>[${label}]</strong>`;
+            p.appendChild(document.createElement('br'));
+            p.appendChild(document.createTextNode(data.message));
+            
+            // *** SỬA LỖI 2: Thêm log mới lên trên cùng ***
+            privateLogContent.prepend(p); 
         });
     }
 
