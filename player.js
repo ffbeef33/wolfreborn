@@ -680,6 +680,13 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (gameState.phase) {
             case 'waiting':
                 // (đã xử lý ở trên)
+                
+                // *** THÊM SỬA ĐỔI ***
+                // Xóa tin nhắn chat cũ khi quay về sảnh chờ
+                if (chatMessages) {
+                    chatMessages.innerHTML = '';
+                }
+                
                 break;
             
             case 'DAY_1_INTRO':
@@ -1315,14 +1322,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // *** HÀM ĐÃ SỬA ***
     function displayChatMessage(message, channel) {
-        if (channel !== activeChatChannel) {
-            return;
-        }
+        // if (channel !== activeChatChannel) {
+        //     return;
+        // } // <-- ĐÃ XÓA
         
         const msgEl = document.createElement('div');
         msgEl.className = 'message-item';
         msgEl.dataset.channel = channel;
+        
+        // *** THÊM SỬA ĐỔI ***
+        // Ẩn tin nhắn nếu nó không thuộc kênh đang hoạt động
+        if (channel !== activeChatChannel) {
+            msgEl.classList.add('hidden');
+        }
         
         if (message.isSystem) {
              msgEl.innerHTML = `<span class="system-message"><em>${message.text}</em></span>`;
@@ -1348,12 +1362,26 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.value = '';
     }
     
+    // *** HÀM ĐÃ SỬA ***
     function switchChatChannel(newChannel) {
         activeChatChannel = newChannel;
         chatChannels.querySelectorAll('.channel-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.channel === newChannel);
         });
-        chatMessages.innerHTML = '';
+        
+        // chatMessages.innerHTML = ''; // <-- ĐÃ XÓA
+        
+        // *** THÊM SỬA ĐỔI ***
+        // Lặp qua tất cả tin nhắn và ẩn/hiện chúng
+        if (chatMessages) {
+             chatMessages.querySelectorAll('.message-item').forEach(msg => {
+                // Ẩn nếu msg.dataset.channel không khớp với newChannel
+                msg.classList.toggle('hidden', msg.dataset.channel !== newChannel);
+            });
+            
+            // Tự động cuộn xuống dưới khi chuyển kênh
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     }
 
     /**
