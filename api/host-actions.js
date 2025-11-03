@@ -163,9 +163,12 @@ export default async function handler(request, response) {
                         await db.ref(`rooms/${roomId}/gameState/startTime`).set(0);
                         return response.status(200).json({ success: true, message: 'Đã skip phase.' });
 
+                    // *** BẮT ĐẦU SỬA LỖI (Lỗi 1) ***
                     case 'end-game':
-                        await setGamePhase(roomId, 'GAME_END', 99999, 0);
+                        // Thay vì chỉ setGamePhase, gọi hàm dọn dẹp mới
+                        await cleanupAndEndGame(db, roomId, players);
                         return response.status(200).json({ success: true, message: 'Đã kết thúc game.' });
+                    // *** KẾT THÚC SỬA LỖI (Lỗi 1) ***
                     
                     case 'delete-room':
                         await db.ref(`rooms/${roomId}`).remove();
@@ -195,7 +198,7 @@ export default async function handler(request, response) {
 
 /**
  * Xử lý logic khi Host bắt đầu game
- * *** ĐÃ SỬA LỖI 1: Không xáo trộn mảng gốc ***
+ * *** ĐÃ SỬA LỖI (Lỗi 3): Thêm dọn dẹp originalRoleName ***
  */
 async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
@@ -211,22 +214,20 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
     if (!hasWolf) throw new Error('Game phải có tối thiểu 1 vai trò thuộc Bầy Sói.');
 
     // 2. Trộn và phân vai
-    
-    // *** SỬA LỖI 1 (Giữ nguyên) ***
-    // Tạo một bản sao của mảng roles để xáo trộn
     const shuffledRoles = [...rolesToAssign];
     shuffledRoles.sort(() => Math.random() - 0.5); 
     
     const updates = {};
     
     playerIds.forEach((pId, index) => {
-        const assignedRoleName = shuffledRoles[index]; // Lấy từ mảng đã xáo trộn
+        const assignedRoleName = shuffledRoles[index];
         const roleData = allRolesData[assignedRoleName] || {};
         
         updates[`/players/${pId}/roleName`] = assignedRoleName;
         updates[`/players/${pId}/faction`] = roleData.Faction || 'Phe Dân'; 
         updates[`/players/${pId}/isAlive`] = true;
-        updates[`/players/${pId}/state`] = {}; 
+        updates[`/players/${pId}/state`] = {}; // Dọn dẹp state
+        updates[`/players/${pId}/originalRoleName`] = null; // *** THÊM SỬA ĐỔI (Lỗi 3) ***
     });
 
     // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
@@ -234,9 +235,7 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
     updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
     updates['/gameState/duration'] = 15; 
     updates['/gameState/nightNumber'] = 1;
-    
-    // Lưu lại mảng roles GỐC (chưa xáo trộn)
-    updates['/gameSettings/roles'] = rolesToAssign; 
+    updates['/gameSettings/roles'] = rolesToAssign;
     
     // Xóa log cũ (nếu có)
     updates['/privateData'] = null;
@@ -247,7 +246,7 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 
 /**
  * Xử lý logic Reset / Restart
- * *** ĐÃ SỬA LỖI 2 (Theo yêu cầu): Khôi phục việc xóa vai trò ***
+ * *** ĐÃ SỬA LỖI (Lỗi 2): Thêm dọn dẹp originalRoleName ***
  */
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
@@ -260,11 +259,12 @@ async function resetGame(db, roomId, keepRoles) {
     Object.keys(roomData.players).forEach(pId => {
         updates[`/players/${pId}/isAlive`] = true;
         updates[`/players/${pId}/causeOfDeath`] = null;
-        updates[`/players/${pId}/state`] = {};
+        updates[`/players/${pId}/state`] = {}; // Dọn dẹp state
+        updates[`/players/${pId}/originalRoleName`] = null; // *** THÊM SỬA ĐỔI (Lỗi 2) ***
+        
         if (!keepRoles) { 
              updates[`/players/${pId}/roleName`] = null;
              updates[`/players/${pId}/faction`] = null;
-             updates[`/players/${pId}/originalRoleName`] = null;
         }
     });
 
@@ -282,12 +282,36 @@ async function resetGame(db, roomId, keepRoles) {
         updates['/gameState/phase'] = 'waiting';
         updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
         updates['/gameState/duration'] = 99999;
-        
-        // *** BẮT ĐẦU SỬA LỖI 2 (Theo yêu cầu) ***
-        // Thêm lại dòng này để buộc Host chọn lại vai trò
-        updates['/gameSettings/roles'] = []; 
-        // *** KẾT THÚC SỬA LỖI 2 ***
+        updates['/gameSettings/roles'] = []; // Dọn dẹp vai trò (theo yêu cầu của bạn)
     }
     
+    await db.ref(`rooms/${roomId}`).update(updates);
+}
+
+// *** THÊM HÀM MỚI (Sửa Lỗi 1) ***
+/**
+ * Dọn dẹp state của người chơi và kết thúc game
+ */
+async function cleanupAndEndGame(db, roomId, players) {
+    const updates = {};
+    
+    // Dọn dẹp state của tất cả người chơi
+    if (players) {
+        Object.keys(players).forEach(pId => {
+            updates[`/players/${pId}/state`] = {};
+            updates[`/players/${pId}/originalRoleName`] = null;
+        });
+    }
+    
+    // Xóa các actions
+    updates['/nightActions'] = null;
+    updates['/votes'] = null;
+
+    // Đặt phase
+    updates['/gameState/phase'] = 'GAME_END';
+    updates['/gameState/startTime'] = ServerValue.TIMESTAMP;
+    updates['/gameState/duration'] = 99999;
+    updates['/gameState/nightNumber'] = 0; // Đặt nightNumber về 0 (hoặc giữ nguyên)
+
     await db.ref(`rooms/${roomId}`).update(updates);
 }
