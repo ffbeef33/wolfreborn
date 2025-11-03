@@ -151,7 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Tải dữ liệu Roles TRƯỚC
         try {
-            // Thêm cache-busting (phá cache) để luôn lấy dữ liệu mới
             const response = await fetch('/api/sheets?sheetName=Roles&t=' + Date.now());
             
             if (!response.ok) {
@@ -543,6 +542,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const hasWolf = (roomData.gameSettings?.roles || []).some(roleName => allRolesData[roleName] && allRolesData[roleName].Faction === 'Bầy Sói');
             
+            // Logic kiểm tra nút "Bắt Đầu"
+            // Giờ đây, chỉ cần "số người" == "số vai trò đã chọn"
+            // Và có ít nhất 1 Sói
             if (playerCount >= 4 && playerCount === rolesSelected && hasWolf) {
                 hostStartGameBtn.disabled = false;
             } else {
@@ -564,8 +566,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    
+    // *** BẮT ĐẦU SỬA LỖI THEO YÊU CẦU CỦA BẠN ***
+
     /**
      * Render các checkbox chọn vai trò cho Host
+     * (Render TẤT CẢ vai trò, bao gồm Dân thường và Sói thường)
      */
     function renderRoleSelection() {
         if (!roleSelectionGrid) {
@@ -574,15 +580,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         roleSelectionGrid.innerHTML = '';
-        
-        const defaultRoles = ["Dân thường", "Sói thường"];
 
         for (const roleName in allRolesData) {
-            if (defaultRoles.includes(roleName)) continue; 
+            // KHÔNG LỌC "Dân thường" và "Sói thường" nữa
+            // if (defaultRoles.includes(roleName)) continue; 
             
             const role = allRolesData[roleName];
             
-            if (!role.Faction) continue; 
+            if (!role.Faction) continue; // Vẫn giữ bộ lọc rác
             
             const div = document.createElement('div');
             div.className = 'role-selection-item'; 
@@ -599,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Cập nhật số lượng vai trò Host đã chọn và gửi lên Firebase
+     * (Chỉ đếm những gì Host tick, KHÔNG tự động fill)
      */
     function updateRoleSelectionCount() {
         if (!isHost) return;
@@ -609,26 +615,14 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedRoles.push(cb.value);
         });
         
-        const playerCount = parseInt(playerCountInRoom.textContent, 10) || 0;
+        // BỎ logic tự động fill
+        // const playerCount = parseInt(playerCountInRoom.textContent, 10) || 0;
+        // const wolfRoleName = "Sói thường"; 
+        // ... (đã xóa) ...
+        // const civilianRoleName = "Dân thường"; 
+        // ... (đã xóa) ...
         
-        const wolfRoleName = "Sói thường"; 
-        if (allRolesData[wolfRoleName]) {
-            selectedRoles.push(wolfRoleName);
-        } else {
-            console.error("LỖI LOGIC: Không tìm thấy vai trò 'Sói thường' trong allRolesData. Hãy kiểm tra Google Sheet!");
-        }
-        
-        const civilianRoleName = "Dân thường"; 
-        const civilianCount = playerCount - selectedRoles.length;
-
-        if (allRolesData[civilianRoleName]) {
-            for (let i = 0; i < civilianCount; i++) {
-                selectedRoles.push(civilianRoleName);
-            }
-        } else {
-             console.error("LỖI LOGIC: Không tìm thấy vai trò 'Dân thường' trong allRolesData. Hãy kiểm tra Google Sheet!");
-        }
-        
+        // Chỉ đếm số lượng Host đã tick
         roleCountSelected.textContent = selectedRoles.length;
         
         if (currentRoomId) {
@@ -639,6 +633,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+    
+    // *** KẾT THÚC SỬA LỖI ***
+
 
     /**
      * Hàm chính điều khiển giao diện dựa trên phase
