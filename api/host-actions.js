@@ -176,12 +176,7 @@ export default async function handler(request, response) {
 
                     case 'end-game':
                         await setGamePhase(roomId, 'GAME_END', 99999, 0);
-                        await db.ref(`rooms/${roomId}/publicData/latestAnnouncement`).set({
-                            message: "Host đã kết thúc game.",
-                            type: 'game_end',
-                            // SỬA LỖI 1: Dùng ServerValue
-                            timestamp: ServerValue.TIMESTAMP 
-                        });
+                        // (Đã xóa thông báo công khai, vì game-engine sẽ xử lý)
                         return response.status(200).json({ success: true, message: 'Đã kết thúc game.' });
                     
                     case 'delete-room':
@@ -212,6 +207,7 @@ export default async function handler(request, response) {
 
 /**
  * Xử lý logic khi Host bắt đầu game
+ * *** ĐÃ SỬA: Bỏ qua DAY_1_INTRO, đi thẳng vào NIGHT ***
  */
 async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
@@ -225,6 +221,15 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
     const allRolesData = await fetchSheetData('Roles'); // Lấy dữ liệu vai trò
     const hasWolf = rolesToAssign.some(roleName => allRolesData[roleName]?.Faction === 'Bầy Sói');
     if (!hasWolf) throw new Error('Game phải có tối thiểu 1 vai trò thuộc Bầy Sói.');
+
+    // *** SỬA LỖI: Lấy thời gian Đêm từ sheet 'Mechanic' ***
+    let phaseTimes = {};
+    try {
+        phaseTimes = await fetchSheetData('Mechanic');
+    } catch (e) {
+        console.error("Không tải được 'Mechanic' sheet khi bắt đầu, dùng 90s mặc định.");
+    }
+    const nightDuration = phaseTimes['ĐÊM'] || 90; // Mặc định 90 giây
 
     // 2. Trộn và phân vai
     rolesToAssign.sort(() => Math.random() - 0.5); // Xáo trộn vai trò
@@ -240,13 +245,16 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
         updates[`/players/${pId}/state`] = {}; // Reset state
     });
 
-    // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
-    updates['/gameState/phase'] = 'DAY_1_INTRO';
-    // SỬA LỖI 1: Dùng ServerValue
+    // 3. Bắt đầu phase đầu tiên (ĐÊM 1)
+    updates['/gameState/phase'] = 'NIGHT'; // *** SỬA LỖI: Bắt đầu bằng ĐÊM ***
     updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
-    updates['/gameState/duration'] = 15; // 15 giây giới thiệu
+    updates['/gameState/duration'] = nightDuration; // *** SỬA LỖI: Dùng thời gian ĐÊM ***
     updates['/gameState/nightNumber'] = 1;
     updates['/gameSettings/roles'] = rolesToAssign; // Lưu lại bộ vai trò đã chọn
+    
+    // Xóa log cũ (nếu có)
+    updates['/privateData'] = null;
+    updates['/publicData'] = null;
 
     await db.ref(`rooms/${roomId}`).update(updates);
 }
