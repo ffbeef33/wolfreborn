@@ -180,7 +180,20 @@ export async function gameLoop(roomId) {
     
     // Lấy luật chơi từ Sheets (sẽ dùng cache)
     const allRolesData = await fetchSheetData('Roles');
-    const phaseTimes = await fetchSheetData('Mechanic');
+    
+    // *** SỬA LỖI 500: BẮT ĐẦU ***
+    // Lấy thời gian phase một cách an toàn, không làm sập server
+    let phaseTimes = {};
+    try {
+        // Thử lấy dữ liệu từ Google Sheet
+        phaseTimes = await fetchSheetData('Mechanic');
+    } catch (e) {
+        console.error(`!!! LỖI NGHIÊM TRỌNG KHI TẢI 'Mechanic' SHEET (Phòng ${roomId}):`, e.message);
+        console.error("!!! Server sẽ dùng thời gian mặc định (fallback) để tiếp tục.");
+        // phaseTimes sẽ là một đối tượng rỗng {}, logic fallback bên dưới sẽ xử lý
+    }
+    // *** SỬA LỖI 500: KẾT THÚC ***
+
 
     // *** BẮT ĐẦU SỬA LỖI: Cập nhật logic đọc thời gian ***
     // Đảm bảo key khớp với Google Sheet (viết hoa)
