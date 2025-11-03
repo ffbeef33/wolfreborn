@@ -349,7 +349,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return; 
         const status = liveStatus[pId];
         const player = players[pId]; 
-        if (!isActionActive(status, player.state, currentNightNumber)) return;
+        // *** SỬA LỖI 500: Đảm bảo player.state không phải là null ***
+        if (!isActionActive(status, (player.state || {}), currentNightNumber)) return;
         
         const action = status.action;
         const targetId = action.targetId;
@@ -372,7 +373,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (!isActionActive(status, player.state, currentNightNumber, true, true)) return; 
+        // *** SỬA LỖI 500: Đảm bảo player.state không phải là null ***
+        if (!isActionActive(status, (player.state || {}), currentNightNumber, true, true)) return; 
         
         const action = status.action;
         const targetId = action.targetId;
@@ -397,7 +399,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (!isActionActive(status, player.state, currentNightNumber) || status.isDisabled) return;
+        // *** SỬA LỖI 500: Đảm bảo player.state không phải là null ***
+        if (!isActionActive(status, (player.state || {}), currentNightNumber) || status.isDisabled) return;
 
         const action = status.action;
         const targetId = action.targetId;
@@ -457,7 +460,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'save') return;
         
         if (status.state.witch_save_used) return;
-        if (!isActionActive(status, player.state, currentNightNumber, true, false)) return; 
+        // *** SỬA LỖI 500: Đảm bảo player.state không phải là null ***
+        if (!isActionActive(status, (player.state || {}), currentNightNumber, true, false)) return; 
 
         const targetId = status.action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
@@ -483,7 +487,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'kill') return;
 
         if (status.state.witch_kill_used) return;
-        if (!isActionActive(status, player.state, currentNightNumber, true, false)) return;
+        // *** SỬA LỖI 500: Đảm bảo player.state không phải là null ***
+        if (!isActionActive(status, (player.state || {}), currentNightNumber, true, false)) return;
 
         const targetId = status.action.targetId;
         if (liveStatus[targetId]) {
@@ -512,7 +517,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.state.witch_save_used) newState.witch_save_used = true;
         if (status.state.witch_kill_used) newState.witch_kill_used = true;
 
-        if (status.action && isActionActive(status, player.state, currentNightNumber, false)) { 
+        // *** SỬA LỖI 500: Đảm bảo player.state không phải là null ***
+        if (status.action && isActionActive(status, (player.state || {}), currentNightNumber, false)) { 
             const activeRule = status.role.Active;
             if (activeRule !== 'n' && activeRule !== '0') {
                 const activeLeft = (parseInt(newState.activeLeft ?? activeRule)) - 1;
@@ -573,7 +579,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
  */
 function isActionActive(status, playerState, currentNightNumber, checkReSelect = true, allowWhenDisabled = false) {
     const role = status.role;
-    const state = playerState; 
+    // *** SỬA LỖI 500: Đảm bảo state không bao giờ là null ***
+    const state = playerState || {};
     const action = status.action;
 
     if (!action) return false;
@@ -585,7 +592,8 @@ function isActionActive(status, playerState, currentNightNumber, checkReSelect =
 
     if (role.Active === '0') return false; 
     if (role.Active !== 'n') {
-        const activeLeft = parseInt(state.activeLeft ?? role.Active);
+        // *** SỬA LỖI 500: Đọc từ state (đã an toàn) ***
+        const activeLeft = (parseInt(state.activeLeft ?? role.Active)); 
         if (activeLeft <= 0) return false; 
     }
   
