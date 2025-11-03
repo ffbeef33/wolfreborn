@@ -9,9 +9,9 @@ import { getDatabase, ServerValue } from 'firebase-admin/database';
 // --- BIẾN TOÀN CỤC (CACHE) ---
 let firebaseAdminApp;
 
-// *** SỬA LỖI 500: Xóa cache toàn cục cho Google API ***
-// let googleAuth; (Đã xóa)
-// let sheetsApi; (Đã xóa)
+// *** SỬA LỖI: Quay lại dùng Singleton Pattern (như code cũ) cho Google API ***
+let googleAuth;
+let sheetsApi;
 
 let rolesDataCache = null;
 let mechanicDataCache = null;
@@ -47,22 +47,24 @@ function getFirebaseAdmin() {
 }
 
 /**
- * Khởi tạo và trả về Google Sheets API.
- * *** SỬA LỖI 500: Không dùng cache, luôn tạo mới để tránh lỗi stale token ***
+ * Khởi tạo và trả về Google Sheets API (Singleton Pattern - Giống code cũ).
  */
 async function getGoogleSheetsAPI() {
-    try {
-        const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
-        const auth = new google.auth.GoogleAuth({
-            credentials,
-            scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
-        });
-        const sheets = google.sheets({ version: 'v4', auth: auth });
-        return sheets;
-    } catch (e) {
-        console.error("Lỗi Khởi Tạo Google Sheets API:", e);
-        throw new Error("Không thể khởi tạo Google Sheets API.");
+    // *** SỬA LỖI: Quay lại dùng Singleton Pattern (như code cũ) ***
+    if (!sheetsApi) {
+        try {
+            const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+            googleAuth = new google.auth.GoogleAuth({
+                credentials,
+                scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+            });
+            sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        } catch (e) {
+            console.error("Lỗi Khởi Tạo Google Sheets API:", e);
+            throw new Error("Không thể khởi tạo Google Sheets API.");
+        }
     }
+    return sheetsApi;
 }
 
 // --- 2. HÀM TRUY CẬP DỮ LIỆU (Với Cache) ---
@@ -81,7 +83,7 @@ export async function fetchSheetData(sheetName) {
     }
 
     try {
-        // *** SỬA LỖI 500: Gọi hàm getGoogleSheetsAPI() đã sửa ***
+        // *** SỬA LỖI: Gọi hàm getGoogleSheetsAPI() (phiên bản singleton) ***
         const sheets = await getGoogleSheetsAPI(); 
         const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
