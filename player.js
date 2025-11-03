@@ -533,8 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hostGameplayControls.classList.add('hidden');
             hostDeleteRoomBtn.classList.remove('hidden'); 
             
-            // *** ĐÂY LÀ DÒNG ĐƯỢC SỬA ***
-            // Đã thay !roleSelectionGrid.hasChildNodes() bằng roleSelectionGrid.children.length === 0
+            // *** ĐÃ SỬA LỖI TRƯỚC: (roleSelectionGrid.children.length === 0) ***
             if (roleSelectionGrid && roleSelectionGrid.children.length === 0 && Object.keys(allRolesData).length > 0) {
                 renderRoleSelection();
             }
@@ -570,8 +569,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     
-    // *** BẮT ĐẦU SỬA LỖI THEO YÊU CẦU CỦA BẠN ***
-
     /**
      * Render các checkbox chọn vai trò cho Host
      * (Render TẤT CẢ vai trò, bao gồm Dân thường và Sói thường)
@@ -619,11 +616,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         // BỎ logic tự động fill
-        // const playerCount = parseInt(playerCountInRoom.textContent, 10) || 0;
-        // const wolfRoleName = "Sói thường"; 
-        // ... (đã xóa) ...
-        // const civilianRoleName = "Dân thường"; 
-        // ... (đã xóa) ...
         
         // Chỉ đếm số lượng Host đã tick
         roleCountSelected.textContent = selectedRoles.length;
@@ -637,8 +629,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // *** KẾT THÚC SỬA LỖI ***
-
 
     /**
      * Hàm chính điều khiển giao diện dựa trên phase
@@ -854,7 +844,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Chọn một mục tiêu để cả bầy cùng cắn.',
                 'wolf_bite'
             );
-            renderTargetList(panel.content, 'wolf_bite', nightNum, 1, true, (pId) => pId !== myPlayerId); 
+            // *** SỬA LỖI: Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
+            renderTargetList(panel.content, 'wolf_bite', nightNum, 1, true, null); 
             interactiveActionSection.appendChild(panel.panel);
         }
 
@@ -884,7 +875,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const panel = createActionPanel(uiInfo.title, uiInfo.description, kind);
                 const reselect = role.ReSelect === '1';
                 const quantity = role.Quantity === 'n' ? 99 : parseInt(role.Quantity);
-                renderTargetList(panel.content, kind, nightNum, quantity, reselect, (pId) => pId !== myPlayerId);
+                // *** SỬA LỖI: Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
+                renderTargetList(panel.content, kind, nightNum, quantity, reselect, null);
                 interactiveActionSection.appendChild(panel.panel);
                 break;
 
@@ -1126,7 +1118,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const players = roomData.players || {};
         
         Object.keys(players).forEach(pId => {
-            if (players[pId].isAlive && pId !== myPlayerId) { 
+            // *** SỬA LỖI: Đã xóa bộ lọc && pId !== myPlayerId ***
+            if (players[pId].isAlive) { 
                 const card = document.createElement('div');
                 card.className = 'target-card';
                 card.dataset.playerId = pId;
@@ -1144,7 +1137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.addEventListener('click', () => {
                     if (card.classList.contains('disabled')) return;
                     
-                    grid.querySelectorAll('.target-card').forEach(el => el.classList.remove('selected'));
+                    // Lỗi logic nhỏ: phải tham chiếu đến targetGrid, không phải 'grid'
+                    targetGrid.querySelectorAll('.target-card').forEach(el => el.classList.remove('selected'));
                     content.querySelector('#assassin-guess-grid')?.remove();
                     
                     card.classList.add('selected');
