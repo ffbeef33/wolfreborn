@@ -2,9 +2,7 @@
 // Xử lý tất cả hành động của Host (Tạo, Tham gia, Start, Kick...)
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-// SỬA LỖI 1: Import ServerValue từ firebase-admin/database
 import { getDatabase, ServerValue } from 'firebase-admin/database';
-// SỬA LỖI 2: Sửa đường dẫn import từ '../' thành './'
 import { fetchSheetData, setGamePhase } from './game-engine.js'; 
 
 // --- 1. KHỞI TẠO FIREBASE ADMIN (Singleton Pattern) ---
@@ -65,12 +63,10 @@ export default async function handler(request, response) {
                     hostId: hostPlayerId,
                     isPrivate: isPrivate || false,
                     password: (isPrivate && password) ? password : null,
-                    // SỬA LỖI 1: Dùng ServerValue
                     createdAt: ServerValue.TIMESTAMP, 
                     gameState: {
                         phase: 'waiting',
                         duration: 99999,
-                        // SỬA LỖI 1: Dùng ServerValue
                         startTime: ServerValue.TIMESTAMP 
                     },
                     players: {
@@ -103,16 +99,12 @@ export default async function handler(request, response) {
                     throw new Error('Game đã bắt đầu, không thể tham gia.');
                 }
                 
-                // Kiểm tra mật khẩu
                 if (roomData.isPrivate && roomData.password !== password) {
                     throw new Error('Mật khẩu phòng không chính xác.');
                 }
 
-                // Kiểm tra trùng tên
                 const playerExists = Object.values(roomData.players).some(p => p.username === username);
                 if (playerExists) {
-                    // Cho phép vào lại nếu đã ở trong phòng (Reconnect)
-                    // (Thêm logic này nếu cần, hiện tại đang chặn)
                     throw new Error('Tên này đã có người sử dụng trong phòng.');
                 }
 
@@ -129,11 +121,8 @@ export default async function handler(request, response) {
 
             // === HÀNH ĐỘNG CỦA HOST (CẦN XÁC THỰC) ===
             default: {
-                // *** BẮT ĐẦU SỬA LỖI 400 ***
                 
-                // Xác thực Host
                 const roomRef = db.ref(`rooms/${roomId}`);
-                // Đọc toàn bộ roomData thay vì chỉ đọc lẻ tẻ
                 const roomSnapshot = await roomRef.once('value'); 
                 if (!roomSnapshot.exists()) {
                     throw new Error('Phòng không tồn tại.');
@@ -142,13 +131,11 @@ export default async function handler(request, response) {
                 
                 const hostId = roomData.hostId;
                 const players = roomData.players || {};
-                const gameSettings = roomData.gameSettings || {}; // Lấy gameSettings
+                const gameSettings = roomData.gameSettings || {}; 
                 
-                // Tìm player có username trùng
                 const matchingPlayerId = Object.keys(players).find(pId => players[pId].username === username);
 
                 if (!matchingPlayerId || matchingPlayerId !== hostId) {
-                // *** KẾT THÚC SỬA LỖI 400 ***
                     throw new Error('Bạn không phải Host, không có quyền thực hiện hành động này.');
                 }
 
@@ -161,22 +148,16 @@ export default async function handler(request, response) {
                         return response.status(200).json({ success: true, message: 'Đã kick người chơi.' });
 
                     case 'start-game':
-                        // *** BẮT ĐẦU SỬA LỖI 400 ***
-                        // Lấy roles từ gameSettings đã đọc, không phải từ request.body
                         const rolesFromSettings = gameSettings.roles || []; 
-                        // Truyền rolesFromSettings thay vì 'roles' (không tồn tại)
                         await handleStartGame(db, roomId, players, rolesFromSettings); 
-                        // *** KẾT THÚC SỬA LỖI 400 ***
                         return response.status(200).json({ success: true, message: 'Game đã bắt đầu.' });
                         
                     case 'skip-phase':
-                        // Chuyển phase ngay lập tức bằng cách set startTime về 0
                         await db.ref(`rooms/${roomId}/gameState/startTime`).set(0);
                         return response.status(200).json({ success: true, message: 'Đã skip phase.' });
 
                     case 'end-game':
                         await setGamePhase(roomId, 'GAME_END', 99999, 0);
-                        // (Đã xóa thông báo công khai, vì game-engine sẽ xử lý)
                         return response.status(200).json({ success: true, message: 'Đã kết thúc game.' });
                     
                     case 'delete-room':
@@ -207,32 +188,23 @@ export default async function handler(request, response) {
 
 /**
  * Xử lý logic khi Host bắt đầu game
- * *** ĐÃ SỬA: Bỏ qua DAY_1_INTRO, đi thẳng vào NIGHT ***
+ * *** ĐÃ SỬA: Bắt đầu bằng DAY_1_INTRO (15 giây) ***
  */
 async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
     const playerCount = playerIds.length;
     
-    // 1. Kiểm tra điều kiện (lấy roles từ body)
+    // 1. Kiểm tra điều kiện
     if (playerCount < 4) throw new Error('Cần tối thiểu 4 người chơi để bắt đầu.');
     if (!rolesToAssign || rolesToAssign.length === 0) throw new Error('Host chưa chọn vai trò.');
     if (playerCount !== rolesToAssign.length) throw new Error(`Số người chơi (${playerCount}) không khớp số vai trò (${rolesToAssign.length}).`);
     
-    const allRolesData = await fetchSheetData('Roles'); // Lấy dữ liệu vai trò
+    const allRolesData = await fetchSheetData('Roles'); 
     const hasWolf = rolesToAssign.some(roleName => allRolesData[roleName]?.Faction === 'Bầy Sói');
     if (!hasWolf) throw new Error('Game phải có tối thiểu 1 vai trò thuộc Bầy Sói.');
 
-    // *** SỬA LỖI: Lấy thời gian Đêm từ sheet 'Mechanic' ***
-    let phaseTimes = {};
-    try {
-        phaseTimes = await fetchSheetData('Mechanic');
-    } catch (e) {
-        console.error("Không tải được 'Mechanic' sheet khi bắt đầu, dùng 90s mặc định.");
-    }
-    const nightDuration = phaseTimes['ĐÊM'] || 90; // Mặc định 90 giây
-
     // 2. Trộn và phân vai
-    rolesToAssign.sort(() => Math.random() - 0.5); // Xáo trộn vai trò
+    rolesToAssign.sort(() => Math.random() - 0.5); 
     const updates = {};
     
     playerIds.forEach((pId, index) => {
@@ -240,17 +212,17 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
         const roleData = allRolesData[assignedRoleName] || {};
         
         updates[`/players/${pId}/roleName`] = assignedRoleName;
-        updates[`/players/${pId}/faction`] = roleData.Faction || 'Phe Dân'; // Faction mặc định
-        updates[`/players/${pId}/isAlive`] = true; // Đảm bảo mọi người đều sống
-        updates[`/players/${pId}/state`] = {}; // Reset state
+        updates[`/players/${pId}/faction`] = roleData.Faction || 'Phe Dân'; 
+        updates[`/players/${pId}/isAlive`] = true;
+        updates[`/players/${pId}/state`] = {}; 
     });
 
-    // 3. Bắt đầu phase đầu tiên (ĐÊM 1)
-    updates['/gameState/phase'] = 'NIGHT'; // *** SỬA LỖI: Bắt đầu bằng ĐÊM ***
+    // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
+    updates['/gameState/phase'] = 'DAY_1_INTRO'; // *** SỬA LỖI: Bắt đầu bằng DAY_1_INTRO ***
     updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
-    updates['/gameState/duration'] = nightDuration; // *** SỬA LỖI: Dùng thời gian ĐÊM ***
+    updates['/gameState/duration'] = 15; // *** SỬA LỖI: 15 giây giới thiệu ***
     updates['/gameState/nightNumber'] = 1;
-    updates['/gameSettings/roles'] = rolesToAssign; // Lưu lại bộ vai trò đã chọn
+    updates['/gameSettings/roles'] = rolesToAssign;
     
     // Xóa log cũ (nếu có)
     updates['/privateData'] = null;
@@ -265,41 +237,35 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
     const snapshot = await roomRef.once('value');
-    if (!snapshot.exists()) return; // Phòng đã bị xóa
+    if (!snapshot.exists()) return;
     const roomData = snapshot.val();
 
     const updates = {};
     
-    // Reset tất cả người chơi
     Object.keys(roomData.players).forEach(pId => {
         updates[`/players/${pId}/isAlive`] = true;
         updates[`/players/${pId}/causeOfDeath`] = null;
         updates[`/players/${pId}/state`] = {};
-        if (!keepRoles) { // Nếu là "Thiết lập lại", xóa luôn vai trò
+        if (!keepRoles) { 
              updates[`/players/${pId}/roleName`] = null;
              updates[`/players/${pId}/faction`] = null;
              updates[`/players/${pId}/originalRoleName`] = null;
         }
     });
 
-    // Xóa dữ liệu game cũ
     updates['/nightActions'] = null;
     updates['/votes'] = null;
     updates['/publicData'] = null;
     updates['/privateData'] = null;
-    updates['/chat'] = null; // Xóa lịch sử chat
+    updates['/chat'] = null;
     
     if (keepRoles && roomData.gameSettings?.roles) {
-        // Nếu là "Khởi động lại", bắt đầu game ngay với vai trò cũ
-        // (Cần chạy lại logic phân vai)
         await handleStartGame(db, roomId, roomData.players, roomData.gameSettings.roles);
     } else {
-        // Nếu là "Thiết lập lại", quay về phòng chờ
         updates['/gameState/phase'] = 'waiting';
-        // SỬA LỖI 1: Dùng ServerValue
         updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
         updates['/gameState/duration'] = 99999;
-        updates['/gameSettings/roles'] = []; // Xóa bộ vai trò
+        updates['/gameSettings/roles'] = []; 
     }
     
     await db.ref(`rooms/${roomId}`).update(updates);
