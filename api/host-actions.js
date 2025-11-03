@@ -95,7 +95,7 @@ export default async function handler(request, response) {
                 }
                 const roomData = snapshot.val();
 
-                // --- *** BẮT ĐẦU SỬA ĐỔI LOGIC *** ---
+                // --- *** LOGIC RECONNECT ĐÃ SỬA *** ---
 
                 // 1. Kiểm tra xem người chơi đã ở trong phòng (đang reconnect)
                 const playerExists = Object.values(roomData.players).some(p => p.username === username);
@@ -115,8 +115,6 @@ export default async function handler(request, response) {
                     throw new Error('Mật khẩu phòng không chính xác.');
                 }
 
-                // (Không cần kiểm tra playerExists nữa vì đã kiểm tra ở trên)
-
                 const newPlayerId = `player_${Math.random().toString(36).substring(2, 9)}`;
                 await db.ref(`rooms/${roomId}/players/${newPlayerId}`).set({
                     username: username,
@@ -126,8 +124,6 @@ export default async function handler(request, response) {
                 });
                 
                 return response.status(200).json({ success: true, roomId: roomId });
-                
-                // --- *** KẾT THÚC SỬA ĐỔI LOGIC *** ---
             }
 
             // === HÀNH ĐỘNG CỦA HOST (CẦN XÁC THỰC) ===
@@ -199,7 +195,7 @@ export default async function handler(request, response) {
 
 /**
  * Xử lý logic khi Host bắt đầu game
- * *** ĐÃ SỬA: Bắt đầu bằng DAY_1_INTRO (15 giây) ***
+ * *** ĐÃ SỬA LỖI 1: Không xáo trộn mảng gốc ***
  */
 async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
@@ -215,11 +211,16 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
     if (!hasWolf) throw new Error('Game phải có tối thiểu 1 vai trò thuộc Bầy Sói.');
 
     // 2. Trộn và phân vai
-    rolesToAssign.sort(() => Math.random() - 0.5); 
+    
+    // *** SỬA LỖI 1 (Giữ nguyên) ***
+    // Tạo một bản sao của mảng roles để xáo trộn
+    const shuffledRoles = [...rolesToAssign];
+    shuffledRoles.sort(() => Math.random() - 0.5); 
+    
     const updates = {};
     
     playerIds.forEach((pId, index) => {
-        const assignedRoleName = rolesToAssign[index];
+        const assignedRoleName = shuffledRoles[index]; // Lấy từ mảng đã xáo trộn
         const roleData = allRolesData[assignedRoleName] || {};
         
         updates[`/players/${pId}/roleName`] = assignedRoleName;
@@ -229,11 +230,13 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
     });
 
     // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
-    updates['/gameState/phase'] = 'DAY_1_INTRO'; // *** SỬA LỖI: Bắt đầu bằng DAY_1_INTRO ***
+    updates['/gameState/phase'] = 'DAY_1_INTRO';
     updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
-    updates['/gameState/duration'] = 15; // *** SỬA LỖI: 15 giây giới thiệu ***
+    updates['/gameState/duration'] = 15; 
     updates['/gameState/nightNumber'] = 1;
-    updates['/gameSettings/roles'] = rolesToAssign;
+    
+    // Lưu lại mảng roles GỐC (chưa xáo trộn)
+    updates['/gameSettings/roles'] = rolesToAssign; 
     
     // Xóa log cũ (nếu có)
     updates['/privateData'] = null;
@@ -244,6 +247,7 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 
 /**
  * Xử lý logic Reset / Restart
+ * *** ĐÃ SỬA LỖI 2 (Theo yêu cầu): Khôi phục việc xóa vai trò ***
  */
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
@@ -271,12 +275,18 @@ async function resetGame(db, roomId, keepRoles) {
     updates['/chat'] = null;
     
     if (keepRoles && roomData.gameSettings?.roles) {
+        // Đây là logic "Restart" (Khởi động lại)
         await handleStartGame(db, roomId, roomData.players, roomData.gameSettings.roles);
     } else {
+        // Đây là logic "Reset" (Thiết lập lại)
         updates['/gameState/phase'] = 'waiting';
         updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
         updates['/gameState/duration'] = 99999;
+        
+        // *** BẮT ĐẦU SỬA LỖI 2 (Theo yêu cầu) ***
+        // Thêm lại dòng này để buộc Host chọn lại vai trò
         updates['/gameSettings/roles'] = []; 
+        // *** KẾT THÚC SỬA LỖI 2 ***
     }
     
     await db.ref(`rooms/${roomId}`).update(updates);
