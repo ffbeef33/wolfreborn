@@ -55,7 +55,7 @@ async function getGoogleSheetsAPI() {
         const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
         const auth = new google.auth.GoogleAuth({
             credentials,
-            scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
+            scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
         });
         const sheets = google.sheets({ version: 'v4', auth: auth });
         return sheets;
@@ -140,6 +140,7 @@ export async function fetchSheetData(sheetName) {
 
 /**
  * Hàm "trái tim" của GM Bot.
+ * *** ĐÃ SỬA: Phục hồi DAY_1_INTRO ***
  */
 export async function gameLoop(roomId) {
     const db = getDatabase(getFirebaseAdmin());
@@ -197,11 +198,12 @@ export async function gameLoop(roomId) {
         'NGÀY': phaseTimes['NGÀY'] || 180,
         'ĐÊM': phaseTimes['ĐÊM'] || 90, 
         'BIỂU QUYẾT': phaseTimes['BIỂU QUYẾT'] || 60,
-        'DAY_1_INTRO': phaseTimes['DAY_1_INTRO'] || 15 
+        'DAY_1_INTRO': phaseTimes['DAY_1_INTRO'] || 15 // *** SỬA LỖI: Thêm lại DAY_1_INTRO ***
     };
 
     switch (state.phase) {
         
+        // *** SỬA LỖI: Thêm lại case DAY_1_INTRO ***
         case 'DAY_1_INTRO':
             // Hết 15s giới thiệu, vào Đêm 1
             await setGamePhase(roomId, 'NIGHT', safePhaseTimes['ĐÊM'], 1);
@@ -214,16 +216,8 @@ export async function gameLoop(roomId) {
             const nightResults = calculateNightStatus(players, nightActions, allRolesData, state.nightNumber);
             await applyNightResults(roomId, nightResults, state.nightNumber);
             
-            // *** SỬA LỖI: Thêm kiểm tra thắng/thua sau đêm ***
-            const winConditionAfterNight = await checkWinCondition(roomId);
-            if (winConditionAfterNight.isEnd) {
-                await announceWinner(roomId, winConditionAfterNight.winner);
-                await setGamePhase(roomId, 'GAME_END', 99999, state.nightNumber);
-            } else {
-                // Nếu game chưa kết thúc, chuyển sang Thảo luận
-                await setGamePhase(roomId, 'DAY_DISCUSS', safePhaseTimes['NGÀY'], state.nightNumber);
-            }
-            // *** KẾT THÚC SỬA LỖI ***
+            // Chuyển thẳng sang THẢO LUẬN, bỏ qua DAY_RESULT
+            await setGamePhase(roomId, 'DAY_DISCUSS', safePhaseTimes['NGÀY'], state.nightNumber);
             break;
 
         case 'DAY_DISCUSS':
@@ -782,12 +776,6 @@ async function checkWinCondition(roomId) {
     let villagerCount = 0;
     let thirdPartyCount = 0;
 
-    // *** SỬA LỖI: Đảm bảo players tồn tại trước khi dùng Object.values ***
-    if (!players) {
-        console.error(`Lỗi checkWinCondition: Không tìm thấy players trong phòng ${roomId}`);
-        return { isEnd: false, winner: null }; // Không thể xác định, game tiếp tục
-    }
-
     Object.values(players).forEach(p => {
         if (p.isAlive) {
             if (p.faction === "Bầy Sói") {
@@ -819,13 +807,6 @@ async function announceWinner(roomId, winnerFaction) {
      
      const playersSnapshot = await db.ref(`rooms/${roomId}/players`).once('value');
      const players = playersSnapshot.val();
-
-     // *** SỬA LỖI: Đảm bảo players tồn tại ***
-     if (!players) {
-         console.error(`Lỗi announceWinner: Không tìm thấy players trong phòng ${roomId}`);
-         return;
-     }
-
      const updates = {};
      const timestamp = ServerValue.TIMESTAMP;
      
