@@ -480,6 +480,12 @@ document.addEventListener('DOMContentLoaded', () => {
             
             updateChatChannels(myPlayerData, roomData.gameState?.phase); 
             
+            // *** SỬA LỖI (Bỏ qua "processing...") ***
+            // Nếu phase đang là processing, không trigger loop
+            if (roomData.gameState?.phase.startsWith('PROCESSING_')) {
+                hasTriggeredLoop = false;
+            }
+            
             if (roomData.publicData?.latestAnnouncement) {
                 showAnnouncement(roomData.publicData.latestAnnouncement);
             }
@@ -572,6 +578,13 @@ document.addEventListener('DOMContentLoaded', () => {
             hostDeleteRoomBtn.classList.add('hidden'); 
             hostSkipPhaseBtn.classList.remove('hidden');
             hostStartGameBtn.classList.add('hidden');
+            
+            // *** SỬA LỖI (Vô hiệu hóa nút Skip khi đang xử lý) ***
+            if (phase.startsWith('PROCESSING_')) {
+                 hostSkipPhaseBtn.disabled = true;
+            } else {
+                 hostSkipPhaseBtn.disabled = false;
+            }
         }
     }
 
@@ -685,6 +698,20 @@ document.addEventListener('DOMContentLoaded', () => {
             roleRevealSection.classList.remove('hidden'); // Hiển thị trong tất cả các phase khác
         }
 
+        // *** SỬA LỖI: Xử lý phase "Processing" ***
+        if (gameState.phase.startsWith('PROCESSING_')) {
+            waitingSection.classList.remove('hidden');
+            waitingTitle.textContent = "Đang xử lý...";
+            
+            let phaseName = '';
+            if (gameState.phase.includes('NIGHT')) phaseName = 'Đêm';
+            else if (gameState.phase.includes('VOTE')) phaseName = 'Biểu Quyết';
+            
+            waitingMessage.textContent = `Đang tổng kết kết quả ${phaseName}. Vui lòng chờ...`;
+            updateTimerDisplay(null); // Tắt timer
+            return;
+        }
+
         switch (gameState.phase) {
             case 'waiting':
                 // (đã xử lý ở trên)
@@ -763,7 +790,13 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function updateTimerDisplay(gameState) {
         if (window.phaseTimerInterval) clearInterval(window.phaseTimerInterval);
-        if (!gameState) return; 
+        
+        // *** SỬA LỖI: Tắt timer nếu gameState là null (ví dụ: đang processing) ***
+        if (!gameState) {
+             [voteTimerDisplay, phaseTimerDisplay, getEl('role-reveal-timer-display'), getEl('night-phase-timer-display')]
+                 .forEach(t => { if(t) t.textContent = '--'; });
+             return;
+        }
 
         // Tìm timer trong card đang hiển thị
         let visibleTimerDisplay = null;
@@ -794,7 +827,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(window.phaseTimerInterval);
                 if (visibleTimerDisplay) visibleTimerDisplay.textContent = "0:00";
                 
-                if (!hasTriggeredLoop && currentRoomId && gameState.phase !== 'waiting' && gameState.phase !== 'GAME_END') {
+                // *** SỬA LỖI: Bỏ qua trigger nếu phase là processing... ***
+                if (!hasTriggeredLoop && currentRoomId && gameState.phase !== 'waiting' && gameState.phase !== 'GAME_END' && !gameState.phase.startsWith('PROCESSING_')) {
                     hasTriggeredLoop = true; 
                     console.log("Timer hit 0. Triggering game loop...");
                     
@@ -1355,6 +1389,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleSendMessage() {
         const text = messageInput.value.trim();
         if (!text || !currentRoomId || !myPlayerId) return;
+
+        // =======================================================
+        // === SỬA LỖI (CHAT KHI CHẾT) BẮT ĐẦU ===
+        // =======================================================
+        if (!currentRoomData) return; // Đảm bảo đã tải dữ liệu
+        const myPlayerData = currentRoomData.players[myPlayerId];
+
+        if (myPlayerData && !myPlayerData.isAlive && activeChatChannel === 'living') {
+            // Người chết cố chat ở kênh Sống
+            console.warn("Người chết không thể chat ở kênh Người Sống.");
+            messageInput.value = ''; // Xóa tin nhắn
+            return; // Dừng
+        }
+        // =======================================================
+        // === SỬA LỖI (CHAT KHI CHẾT) KẾT THÚC ===
+        // =======================================================
         
         const message = {
             sender: myUsername,
@@ -1384,6 +1434,23 @@ document.addEventListener('DOMContentLoaded', () => {
             // Tự động cuộn xuống dưới khi chuyển kênh
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
+
+        // =======================================================
+        // === SỬA LỖI (VÔ HIỆU HÓA CHAT UI) BẮT ĐẦU ===
+        // =======================================================
+        const myPlayerData = currentRoomData?.players?.[myPlayerId];
+        if (myPlayerData && !myPlayerData.isAlive && newChannel === 'living') {
+            messageInput.disabled = true;
+            messageInput.placeholder = "Người chết không thể chat ở đây...";
+            sendMessageBtn.disabled = true;
+        } else {
+            messageInput.disabled = false;
+            messageInput.placeholder = "Nhập tin nhắn...";
+            sendMessageBtn.disabled = false;
+        }
+        // =======================================================
+        // === SỬA LỖI (VÔ HIỆU HÓA CHAT UI) KẾT THÚC ===
+        // =======================================================
     }
 
     /**
@@ -1405,6 +1472,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!myPlayerData.isAlive) {
             deadChannel.classList.remove('hidden');
             if (activeChatChannel !== 'dead') switchChatChannel('dead'); 
+            
+            // *** SỬA LỖI: Gọi lại switchChatChannel để vô hiệu hóa UI nếu cần ***
+            switchChatChannel(activeChatChannel); 
         } else {
             deadChannel.classList.add('hidden');
             if (activeChatChannel === 'dead') switchChatChannel('living');

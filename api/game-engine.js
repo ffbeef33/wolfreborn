@@ -614,7 +614,12 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
                 // (Dòng này đã được sửa ở lần 1)
                 newState.armorLeft = status.passive.armor - 1;
 
-                if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ.");
+                // ===============================================
+                // === SỬA LỖI (THEO YÊU CẦU): Xóa log Giáp
+                // ===============================================
+                // if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ."); // <-- ĐÃ XÓA DÒNG NÀY
+                // ===============================================
+                
             } else {
                 
                 // ===============================================
