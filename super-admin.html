@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Dashboard</title>
+    <link rel="stylesheet" href="assets/player-style.css">
+    <style>
+        /* CSS Thêm cho trang SA */
+        body { padding: 20px; }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+        }
+        #room-list-sa .room-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #room-list-sa .room-details {
+            text-align: left;
+        }
+        #room-list-sa .room-details span {
+            display: block;
+            font-size: 0.9em;
+            color: var(--light-text);
+        }
+        #room-list-sa .room-details strong {
+            font-size: 1.2em;
+            color: var(--text-color);
+        }
+        .delete-room-btn {
+            width: auto;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            margin: 0;
+            background-color: var(--danger-bg);
+        }
+        .delete-room-btn:hover {
+            background-color: var(--danger-hover-bg);
+        }
+    </style>
+</head>
+<body>
+    <div class="container card">
+        <header class="player-header">
+            <h1>👑 Bảng Điều Khiển Super Admin</h1>
+            <p>Quản lý tất cả các phòng đang hoạt động.</p>
+        </header>
+
+        <button id="fetch-rooms-btn" style="margin-top: 15px;">Tải Danh Sách Phòng</button>
+        <p id="loading-message" class="hidden">Đang tải...</p>
+        
+        <div id="room-list-sa" style="margin-top: 20px;">
+            </div>
+    </div>
+
+    <script src="super-admin.js"></script>
+</body>
+</html>

@@ -146,6 +146,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Xử lý đăng nhập Super Admin ---
     const handleAdminLogin = () => {
         const password = adminPassword.value;
+        if (!password) {
+            alert('Vui lòng nhập mật khẩu Super Admin!');
+            return;
+        }
         adminButton.disabled = true;
         
         // SỬ DỤNG ĐƯỜNG DẪN TƯƠNG ĐỐI
@@ -157,9 +161,16 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // (Bạn cần tạo một trang super-admin.html riêng cho việc này)
-                // window.location.href = 'super-admin.html';
-                alert('Đăng nhập Super Admin thành công!'); // Tạm thời
+                // ===============================================
+                // === SỬA LỖI TẠI ĐÂY ===
+                // ===============================================
+                // Lưu mật khẩu vào sessionStorage để dùng ở trang sau
+                sessionStorage.setItem('mywolf_sa_pass', password);
+                // Chuyển hướng đến trang super-admin.html
+                window.location.href = 'super-admin.html';
+                // ===============================================
+                // === KẾT THÚC SỬA LỖI ===
+                // ===============================================
             } else {
                 alert('Mật khẩu Super Admin không chính xác!');
             }
