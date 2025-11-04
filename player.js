@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const firebaseConfig = {
         apiKey: "AIzaSyBEms1bIjCN8tUootTYQGAralVMh8cO5_w",
         authDomain: "ma-soi-web-app.firebaseapp.com",
-        databaseURL: "https://ma-soi-web-app-default-rtdb.asia-southeast1.firebasede.app",
+        databaseURL: "https://ma-soi-web-app-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "ma-soi-web-app",
         storageBucket: "ma-soi-web-app.firebasestorage.app",
         messagingSenderId: "285959781073",
