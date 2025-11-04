@@ -344,10 +344,10 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             if (role.PassiveKind === 'armor') {
                 
                 // ===============================================
-                // === SỬA LỖI TẠI ĐÂY (Dòng 464 gốc) ===
+                // === SỬA LỖI LẦN 2 (Dòng 464) ===
+                // *** PHỤC HỒI (REVERT) VỀ LOGIC GỐC CỦA BẠN (để sửa lỗi chết ở hit 1) ***
                 const armorLeft = player.state?.armorLeft;
-                // *** ĐÃ SỬA LỖI: Bỏ điều kiện (armorLeft === 0) ***
-                liveStatus[pId].passive.armor = (armorLeft === null || armorLeft === undefined) ? 2 : armorLeft;
+                liveStatus[pId].passive.armor = (armorLeft === 0 || armorLeft === null || armorLeft === undefined) ? 2 : armorLeft;
                 // ===============================================
 
             }
@@ -509,7 +509,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
         const targetStatus = liveStatus[targetId];
         // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
-        const armor = targetStatus.passive.armor || 1;
+        // *** SỬA LỖI: Dùng ?? (nullish) thay vì || (or) để 0 vẫn là 0 ***
+        const armor = targetStatus.passive.armor ?? 1;
 
         if (targetStatus.damage >= armor && !targetStatus.isProtected) {
             targetStatus.isSaved = true;
@@ -581,8 +582,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
                 if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ.");
             } else {
                 
-                // (Dòng này đã được sửa ở lần 2)
-                newState.armorLeft = 0; 
+                // ===============================================
+                // === SỬA LỖI LẦN 2 (Dòng 708) ===
+                // *** Thêm điều kiện (status.passive.armor === 1) ***
+                // *** (để sửa lỗi log) ***
+                if (status.passive.armor === 1) {
+                    newState.armorLeft = 0;
+                }
+                // ===============================================
 
                 status.isAlive = false; 
                 nightResults.deaths.push({
