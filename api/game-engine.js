@@ -546,10 +546,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const player = players[pId];
         
         const newState = { ...status.state }; 
+        
+        // (DÒNG 671 ĐÃ BỊ XÓA TRONG SUY NGHĨ TRƯỚC - NHƯNG GIỮ LẠI CŨNG KHÔNG SAO
+        // VÌ LỖI CRASH ĐÃ ĐƯỢC FIX)
         // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
         if (status.passive.armor) {
             newState.armorLeft = status.passive.armor;
         }
+        
         if (status.state.witch_save_used) newState.witch_save_used = true;
         if (status.state.witch_kill_used) newState.witch_kill_used = true;
 
@@ -564,12 +568,18 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.action && status.action.targetId) {
             newState.lastTargetId = status.action.targetId;
         }
-        nightResults.stateUpdates[pId] = newState;
         
+        // (Sửa lỗi crash đã được áp dụng bên dưới)
+
         if (status.damage > 0 && !status.isProtected && !status.isSaved) {
             // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
             if (status.passive.armor && status.passive.armor > 1) {
-                nightResults.stateUpdates[pId].armorLeft = status.passive.armor - 1;
+                
+                // ===============================================
+                // === SỬA LỖI TẠI ĐÂY (Dòng 684 gốc) ===
+                newState.armorLeft = status.passive.armor - 1;
+                // ===============================================
+
                 if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ.");
             } else {
                 status.isAlive = false; 
@@ -582,6 +592,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
                 if (privateLogs[pId]) privateLogs[pId].push('Bạn đã CHẾT!');
             }
         }
+        
+        nightResults.stateUpdates[pId] = newState; // Ghi lại newState (đã cập nhật)
 
         if (status.isCursed) {
             nightResults.factionChanges.push({
