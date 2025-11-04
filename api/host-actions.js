@@ -163,12 +163,10 @@ export default async function handler(request, response) {
                         await db.ref(`rooms/${roomId}/gameState/startTime`).set(0);
                         return response.status(200).json({ success: true, message: 'Đã skip phase.' });
 
-                    // *** BẮT ĐẦU SỬA LỖI (Lỗi 1) ***
                     case 'end-game':
-                        // Thay vì chỉ setGamePhase, gọi hàm dọn dẹp mới
+                        // *** ĐÃ SỬA: Gọi hàm dọn dẹp mới ***
                         await cleanupAndEndGame(db, roomId, players);
                         return response.status(200).json({ success: true, message: 'Đã kết thúc game.' });
-                    // *** KẾT THÚC SỬA LỖI (Lỗi 1) ***
                     
                     case 'delete-room':
                         await db.ref(`rooms/${roomId}`).remove();
@@ -198,7 +196,7 @@ export default async function handler(request, response) {
 
 /**
  * Xử lý logic khi Host bắt đầu game
- * *** ĐÃ SỬA LỖI (Lỗi 3): Thêm dọn dẹp originalRoleName ***
+ * *** ĐÃ SỬA LỖI: Thêm dọn dẹp state và originalRoleName ***
  */
 async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
@@ -226,8 +224,11 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
         updates[`/players/${pId}/roleName`] = assignedRoleName;
         updates[`/players/${pId}/faction`] = roleData.Faction || 'Phe Dân'; 
         updates[`/players/${pId}/isAlive`] = true;
-        updates[`/players/${pId}/state`] = {}; // Dọn dẹp state
-        updates[`/players/${pId}/originalRoleName`] = null; // *** THÊM SỬA ĐỔI (Lỗi 3) ***
+        
+        // *** BẮT ĐẦU SỬA LỖI (Dọn dẹp state) ***
+        updates[`/players/${pId}/state`] = {}; 
+        updates[`/players/${pId}/originalRoleName`] = null; 
+        // *** KẾT THÚC SỬA LỖI ***
     });
 
     // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
@@ -246,7 +247,7 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 
 /**
  * Xử lý logic Reset / Restart
- * *** ĐÃ SỬA LỖI (Lỗi 2): Thêm dọn dẹp originalRoleName ***
+ * *** ĐÃ SỬA LỖI: Thêm dọn dẹp state và originalRoleName ***
  */
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
@@ -259,8 +260,11 @@ async function resetGame(db, roomId, keepRoles) {
     Object.keys(roomData.players).forEach(pId => {
         updates[`/players/${pId}/isAlive`] = true;
         updates[`/players/${pId}/causeOfDeath`] = null;
-        updates[`/players/${pId}/state`] = {}; // Dọn dẹp state
-        updates[`/players/${pId}/originalRoleName`] = null; // *** THÊM SỬA ĐỔI (Lỗi 2) ***
+        
+        // *** BẮT ĐẦU SỬA LỖI (Dọn dẹp state) ***
+        updates[`/players/${pId}/state`] = {};
+        updates[`/players/${pId}/originalRoleName`] = null; 
+        // *** KẾT THÚC SỬA LỖI ***
         
         if (!keepRoles) { 
              updates[`/players/${pId}/roleName`] = null;
@@ -288,9 +292,9 @@ async function resetGame(db, roomId, keepRoles) {
     await db.ref(`rooms/${roomId}`).update(updates);
 }
 
-// *** THÊM HÀM MỚI (Sửa Lỗi 1) ***
 /**
  * Dọn dẹp state của người chơi và kết thúc game
+ * *** ĐÃ SỬA LỖI: Thêm dọn dẹp state và originalRoleName ***
  */
 async function cleanupAndEndGame(db, roomId, players) {
     const updates = {};
@@ -298,8 +302,10 @@ async function cleanupAndEndGame(db, roomId, players) {
     // Dọn dẹp state của tất cả người chơi
     if (players) {
         Object.keys(players).forEach(pId => {
+            // *** BẮT ĐẦU SỬA LỖI (Dọn dẹp state) ***
             updates[`/players/${pId}/state`] = {};
             updates[`/players/${pId}/originalRoleName`] = null;
+            // *** KẾT THÚC SỬA LỖI ***
         });
     }
     
@@ -311,7 +317,7 @@ async function cleanupAndEndGame(db, roomId, players) {
     updates['/gameState/phase'] = 'GAME_END';
     updates['/gameState/startTime'] = ServerValue.TIMESTAMP;
     updates['/gameState/duration'] = 99999;
-    updates['/gameState/nightNumber'] = 0; // Đặt nightNumber về 0 (hoặc giữ nguyên)
+    updates['/gameState/nightNumber'] = 0;
 
     await db.ref(`rooms/${roomId}`).update(updates);
 }
