@@ -680,3 +680,26 @@ button.btn-danger:hover:not(:disabled) {
     border-radius: 8px;
     white-space: pre-wrap;
 }
+/* === CSS THÊM VÀO ĐỂ SỬA LỖI RECONNECT === */
+.room-item {
+    /* Căn chỉnh lại cho 2 cột */
+    align-items: flex-start; 
+}
+
+.room-item > div:last-child {
+    text-align: right; /* Căn phải cột 2 */
+}
+
+.room-status-text {
+    display: block;
+    font-size: 0.85em;
+    font-weight: bold;
+    margin-top: 4px;
+}
+.room-status-text.waiting {
+    color: var(--villager-color); /* Màu xanh lá */
+}
+.room-status-text.ingame {
+    color: var(--wolf-color); /* Màu đỏ */
+}
+/* === KẾT THÚC CSS THÊM VÀO === */

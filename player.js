@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const firebaseConfig = {
         apiKey: "AIzaSyBEms1bIjCN8tUootTYQGAralVMh8cO5_w",
         authDomain: "ma-soi-web-app.firebaseapp.com",
-        databaseURL: "https://ma-soi-web-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+        databaseURL: "https://ma-soi-web-app-default-rtdb.asia-southeast1.firebasede.app",
         projectId: "ma-soi-web-app",
         storageBucket: "ma-soi-web-app.firebasestorage.app",
         messagingSenderId: "285959781073",
@@ -307,22 +307,37 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             rooms.forEach(room => {
-                // Chỉ hiển thị phòng đang chờ
-                if (room.status === 'waiting' || !room.status) {
-                    const item = document.createElement('div');
-                    item.className = 'room-item';
-                    item.dataset.roomId = room.id;
-                    item.dataset.private = room.isPrivate;
-                    item.innerHTML = `
-                        <div>
-                            <span class="room-name">Phòng ${room.id}</span>
-                            <span class="room-status">${room.isPrivate ? '🔒' : '🌍'}</span>
-                        </div>
+                // =======================================================
+                // === SỬA LỖI (RECONNECT) BẮT ĐẦU ===
+                // =======================================================
+                // Gỡ bỏ điều kiện if (room.status === 'waiting'...)
+                // Chúng ta muốn hiển thị CẢ phòng đang chờ VÀ phòng đang chơi
+                // để người chơi có thể "Kết Nối Lại" (reconnect)
+                
+                const isWaiting = (room.status === 'waiting' || !room.status);
+                const statusText = isWaiting ? 'Đang chờ' : 'Đang chơi';
+                
+                const item = document.createElement('div');
+                item.className = 'room-item';
+                item.dataset.roomId = room.id;
+                item.dataset.private = room.isPrivate;
+                
+                // Cập nhật HTML để hiển thị trạng thái
+                item.innerHTML = `
+                    <div>
+                        <span class="room-name">Phòng ${room.id}</span>
+                        <span class="room-status">${room.isPrivate ? '🔒' : '🌍'}</span>
+                    </div>
+                    <div>
                         <span class="room-players">${room.playerCount} người</span>
-                    `;
-                    item.addEventListener('click', () => handleJoinRoomClick(room.id, room.isPrivate));
-                    roomList.appendChild(item);
-                }
+                        <span class="room-status-text ${isWaiting ? 'waiting' : 'ingame'}">${statusText}</span> 
+                    </div>
+                `;
+                item.addEventListener('click', () => handleJoinRoomClick(room.id, room.isPrivate));
+                roomList.appendChild(item);
+                // =======================================================
+                // === SỬA LỖI (RECONNECT) KẾT THÚC ===
+                // =======================================================
             });
 
         } catch (e) {
