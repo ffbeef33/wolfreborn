@@ -338,14 +338,17 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             privateLogs[pId].push(liveStatus[pId].actionLog);
         }
         
-        if (role.Passive === "1") {
-            if (role.Kind === 'armor') {
+        // --- *** BẮT ĐẦU SỬA ĐỔI (Đọc PassiveKind) *** ---
+        // (Giả sử tên cột trong Google Sheet của bạn là 'PassiveKind')
+        if (role.Passive === "1" && role.PassiveKind && role.PassiveKind !== 'none') {
+            if (role.PassiveKind === 'armor') {
                 liveStatus[pId].passive.armor = player.state?.armorLeft ?? 2;
             }
-            if (role.Kind === 'counteraudit') {
+            if (role.PassiveKind === 'counteraudit') {
                 liveStatus[pId].passive.counteraudit = true;
             }
         }
+        // --- *** KẾT THÚC SỬA ĐỔI *** ---
     });
 
     // 2. Xử lý Sói Cắn (Xác định mục tiêu)
@@ -415,6 +418,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.role.Kind === 'audit') {
             const targetStatus = liveStatus[targetId];
             let resultFaction = targetStatus.faction;
+            // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
             if (targetStatus.passive.counteraudit) {
                 if (resultFaction === wolfFaction) resultFaction = "Phe Dân";
                 else if (resultFaction === "Phe Dân") resultFaction = wolfFaction;
@@ -497,6 +501,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!targetId || !liveStatus[targetId]) return;
 
         const targetStatus = liveStatus[targetId];
+        // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
         const armor = targetStatus.passive.armor || 1;
 
         if (targetStatus.damage >= armor && !targetStatus.isProtected) {
@@ -541,6 +546,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const player = players[pId];
         
         const newState = { ...status.state }; 
+        // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
         if (status.passive.armor) {
             newState.armorLeft = status.passive.armor;
         }
@@ -561,6 +567,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         nightResults.stateUpdates[pId] = newState;
         
         if (status.damage > 0 && !status.isProtected && !status.isSaved) {
+            // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
             if (status.passive.armor && status.passive.armor > 1) {
                 nightResults.stateUpdates[pId].armorLeft = status.passive.armor - 1;
                 if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ.");

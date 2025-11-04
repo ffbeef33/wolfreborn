@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 3. ÁNH XẠ KIND MỚI (Cho UI) ---
+    // *** ĐÃ SỬA ĐỔI (Xóa armor và counteraudit) ***
     const KIND_UI_MAP = {
         'empty': { type: 'passive', title: 'Nghỉ ngơi' },
         'shield': { type: 'target', title: 'Bảo vệ', description: 'Chọn một người để bảo vệ đêm nay.' },
@@ -128,11 +129,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'audit': { type: 'target', title: 'Soi phe', description: 'Chọn một người để xem phe của họ.' },
         'witch': { type: 'witch', title: 'Thuốc Phù thủy', description: 'Chọn dùng bình Cứu hoặc bình Giết.' },
         'killwolf': { type: 'target', title: 'Săn Sói', description: 'Chọn một người bạn nghĩ là Sói để bắn.' },
-        'armor': { type: 'passive', title: 'Nội tại: Giáp' },
+        // 'armor': ĐÃ XÓA (vì đã chuyển sang PassiveKind)
         'assassin': { type: 'assassin', title: 'Ám Sát', description: 'Chọn một người để đoán vai trò.' },
         'curse': { type: 'curse', title: 'Nguyền rủa', description: 'Bạn có muốn nguyền rủa mục tiêu Sói cắn không?' },
         'freeze': { type: 'target', title: 'Đóng băng', description: 'Chọn một người để đóng băng chức năng và bảo vệ họ.' },
-        'counteraudit': { type: 'passive', title: 'Nội tại: Phản soi' }
+        // 'counteraudit': ĐÃ XÓA (vì đã chuyển sang PassiveKind)
     };
     
     let selectedRoomToJoin = null; // Biến tạm để lưu ID phòng khi nhập pass
@@ -143,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Chạy khi tải trang
      */
     async function initialize() {
-        // *** SỬA ĐỔI TẠI ĐÂY ***
+        // *** SỬA ĐỔI (Dùng localStorage) ***
         myUsername = localStorage.getItem('mywolf_username');
         if (!myUsername) {
             window.location.href = 'index.html'; // Quay về trang login nếu chưa đăng nhập
@@ -188,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameDashboard = getEl('game-dashboard-container');
 
         // 3. Quyết định UI
-        // *** SỬA ĐỔI TẠI ĐÂY ***
+        // *** SỬA ĐỔI (Dùng localStorage) ***
         currentRoomId = localStorage.getItem('mywolf_roomid');
         if (currentRoomId) {
             showGameRoom(); // Hiển thị UI Game
@@ -358,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Lỗi khi tạo phòng');
 
-            // *** SỬA ĐỔI TẠI ĐÂY ***
+            // *** SỬA ĐỔI (Dùng localStorage) ***
             localStorage.setItem('mywolf_roomid', data.roomId);
             
             // Tải lại trang (cách dễ nhất để vào trạng thái "Game" và gán DOM đúng)
@@ -413,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Lỗi khi vào phòng');
             
-            // *** SỬA ĐỔI TẠI ĐÂY ***
+            // *** SỬA ĐỔI (Dùng localStorage) ***
             localStorage.setItem('mywolf_roomid', selectedRoomToJoin);
             
             // Tải lại trang
@@ -451,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!roomData) {
                 alert("Phòng đã bị xóa bởi Host.");
-                // *** SỬA ĐỔI TẠI ĐÂY ***
+                // *** SỬA ĐỔI (Dùng localStorage) ***
                 localStorage.removeItem('mywolf_roomid');
                 window.location.reload(); // Tải lại về sảnh
                 return;
@@ -460,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
             myPlayerId = Object.keys(roomData.players).find(pId => roomData.players[pId].username === myUsername);
             if (!myPlayerId) {
                 alert("Bạn đã bị kick khỏi phòng.");
-                // *** SỬA ĐỔI TẠI ĐÂY ***
+                // *** SỬA ĐỔI (Dùng localStorage) ***
                 localStorage.removeItem('mywolf_roomid');
                 window.location.reload(); // Tải lại về sảnh
                 return;
@@ -489,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, (error) => {
             console.error("Lỗi listener:", error);
             alert("Mất kết nối với phòng game.");
-            // *** SỬA ĐỔI TẠI ĐÂY ***
+            // *** SỬA ĐỔI (Dùng localStorage) ***
             localStorage.removeItem('mywolf_roomid');
             window.location.reload(); // Tải lại về sảnh
         });
@@ -850,6 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const role = allRolesData[myPlayerData.roleName] || {};
         const state = myPlayerData.state || {};
         const kind = role.Kind;
+        // *** SỬA ĐỔI (Đã cập nhật KIND_UI_MAP) ***
         const uiInfo = KIND_UI_MAP[kind] || KIND_UI_MAP['empty'];
 
         // 1. Kiểm tra Sói (hành động chung)
@@ -859,7 +861,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Chọn một mục tiêu để cả bầy cùng cắn.',
                 'wolf_bite'
             );
-            // *** SỬA LỖI (TỰ CHỌN): Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
             renderTargetList(panel.content, 'wolf_bite', nightNum, 1, true, null); 
             interactiveActionSection.appendChild(panel.panel);
         }
@@ -883,6 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Render UI theo Kind
         switch (uiInfo.type) {
             case 'passive':
+                // *** SỬA ĐỔI *** // Vai trò có PassiveKind (như Giáp) sẽ rơi vào đây vì Kind của nó là 'empty'
                 if (myPlayerData.faction !== 'Bầy Sói') renderRestingPanel();
                 break;
             
@@ -890,7 +892,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const panel = createActionPanel(uiInfo.title, uiInfo.description, kind);
                 const reselect = role.ReSelect === '1';
                 const quantity = role.Quantity === 'n' ? 99 : parseInt(role.Quantity);
-                // *** SỬA LỖI (TỰ CHỌN): Đã xóa bộ lọc (pId) => pId !== myPlayerId ***
                 renderTargetList(panel.content, kind, nightNum, quantity, reselect, null);
                 interactiveActionSection.appendChild(panel.panel);
                 break;
@@ -1133,7 +1134,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const players = roomData.players || {};
         
         Object.keys(players).forEach(pId => {
-            // *** SỬA LỖI (TỰ CHỌN): Đã xóa bộ lọc && pId !== myPlayerId ***
             if (players[pId].isAlive) { 
                 const card = document.createElement('div');
                 card.className = 'target-card';
@@ -1152,7 +1152,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.addEventListener('click', () => {
                     if (card.classList.contains('disabled')) return;
                     
-                    // Lỗi logic nhỏ: phải tham chiếu đến targetGrid
                     targetGrid.querySelectorAll('.target-card').forEach(el => el.classList.remove('selected'));
                     content.querySelector('#assassin-guess-grid')?.remove();
                     
@@ -1439,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (action === 'delete-room') {
                 alert("Đã xóa phòng.");
-                // *** SỬA ĐỔI TẠI ĐÂY ***
+                // *** SỬA ĐỔI (Dùng localStorage) ***
                 localStorage.removeItem('mywolf_roomid');
                 window.location.reload();
             }
