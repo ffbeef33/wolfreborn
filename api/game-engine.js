@@ -238,7 +238,7 @@ export async function gameLoop(roomId) {
             const votes = roomData.votes?.[state.nightNumber] || {};
             const voteResults = calculateVoteResults(roomData.players, votes);
             
-            await applyVoteResults(roomId, voteResults, roomData.players, votes, state.nightNumber);
+            await applyNightResults(roomId, voteResults, roomData.players, votes, state.nightNumber);
             
             // Logic của VOTE_RESULT được chuyển lên đây
             const winCondition = await checkWinCondition(roomId);
@@ -310,7 +310,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         
         if (role.Faction === wolfFaction) {
              const wolfAction = nightActions[pId];
-             if (wolfAction && wolfAction.action === 'wolf_bite' && wolfAction.targetId) {
+             if (wolfAction && wolfAction.action === 'wolf_bite') {
                  actionLog.push(`Bạn đã vote cắn ${players[wolfAction.targetId].username}.`);
              } else {
                  actionLog.push('Bạn đã không vote cắn.');
@@ -343,11 +343,12 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (role.Passive === "1" && role.PassiveKind && role.PassiveKind !== 'none') {
             if (role.PassiveKind === 'armor') {
                 
-                // ===============================================
-                // === SỬA LỖI TẠI ĐÂY (Dòng 464 gốc) ===
+                // =======================================================
+                // === ĐÂY LÀ BẢN SỬA LỖI (Dòng 464-465) ===
+                // Sửa lỗi logic khiến giáp = 0 ở ván trước vẫn là 0 ở ván này
                 const armorLeft = player.state?.armorLeft;
                 liveStatus[pId].passive.armor = (armorLeft === 0 || armorLeft === null || armorLeft === undefined) ? 2 : armorLeft;
-                // ===============================================
+                // =======================================================
 
             }
             if (role.PassiveKind === 'counteraudit') {
@@ -553,7 +554,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         
         const newState = { ...status.state }; 
         
-        // (Dòng 674-676 gốc đã được xóa ở lần trước)
+        // (Dòng 674-676 gốc đã được xóa)
         
         if (status.state.witch_save_used) newState.witch_save_used = true;
         if (status.state.witch_kill_used) newState.witch_kill_used = true;
@@ -574,14 +575,20 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
             if (status.passive.armor && status.passive.armor > 1) {
                 
-                // (Dòng này đã được sửa ở lần 1)
+                // ===============================================
+                // === ĐÂY LÀ BẢN SỬA LỖI (Dòng 700) ===
+                // Sửa lỗi crash (từ 684 gốc)
                 newState.armorLeft = status.passive.armor - 1;
+                // ===============================================
 
                 if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ.");
             } else {
                 
-                // (Dòng này đã được sửa ở lần 2)
+                // ===============================================
+                // === ĐÂY LÀ BẢN SỬA LỖI (Dòng 707) ===
+                // Sửa lỗi logic (đảm bảo giáp = 0 khi chết)
                 newState.armorLeft = 0; 
+                // ===============================================
 
                 status.isAlive = false; 
                 nightResults.deaths.push({
@@ -616,7 +623,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
     if (nightResults.factionChanges.length > 0) {
         const cursedName = players[nightResults.factionChanges[0].playerId].username;
-        publicAnnouncement.push(`${cursName} đã bị Bầy Sói nguyền rủa và biến thành Sói!`);
+        publicAnnouncement.push(`${cursedName} đã bị Bầy Sói nguyền rủa và biến thành Sói!`);
     }
     
     const finalPrivateLogs = {};
