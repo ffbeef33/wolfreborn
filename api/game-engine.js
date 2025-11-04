@@ -342,7 +342,13 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         // (Giả sử tên cột trong Google Sheet của bạn là 'PassiveKind')
         if (role.Passive === "1" && role.PassiveKind && role.PassiveKind !== 'none') {
             if (role.PassiveKind === 'armor') {
-                liveStatus[pId].passive.armor = player.state?.armorLeft ?? 2;
+                
+                // ===============================================
+                // === SỬA LỖI TẠI ĐÂY (Dòng 464 gốc) ===
+                const armorLeft = player.state?.armorLeft;
+                liveStatus[pId].passive.armor = (armorLeft === 0 || armorLeft === null || armorLeft === undefined) ? 2 : armorLeft;
+                // ===============================================
+
             }
             if (role.PassiveKind === 'counteraudit') {
                 liveStatus[pId].passive.counteraudit = true;
@@ -547,12 +553,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         
         const newState = { ...status.state }; 
         
-        // ===============================================
-        // === SỬA LỖI 1: XÓA CÁC DÒNG SAU (dòng 674-676 gốc) ===
-        // if (status.passive.armor) {
-        //     newState.armorLeft = status.passive.armor;
-        // }
-        // ===============================================
+        // (Dòng 674-676 gốc đã được xóa ở lần trước)
         
         if (status.state.witch_save_used) newState.witch_save_used = true;
         if (status.state.witch_kill_used) newState.witch_kill_used = true;
@@ -573,16 +574,14 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
             if (status.passive.armor && status.passive.armor > 1) {
                 
-                // (Dòng này đã được sửa ở lần trước)
+                // (Dòng này đã được sửa ở lần 1)
                 newState.armorLeft = status.passive.armor - 1;
 
                 if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ.");
             } else {
                 
-                // ===============================================
-                // === SỬA LỖI 2: THÊM DÒNG NÀY ===
-                newState.armorLeft = 0;
-                // ===============================================
+                // (Dòng này đã được sửa ở lần 2)
+                newState.armorLeft = 0; 
 
                 status.isAlive = false; 
                 nightResults.deaths.push({
@@ -617,7 +616,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 
     if (nightResults.factionChanges.length > 0) {
         const cursedName = players[nightResults.factionChanges[0].playerId].username;
-        publicAnnouncement.push(`${cursedName} đã bị Bầy Sói nguyền rủa và biến thành Sói!`);
+        publicAnnouncement.push(`${cursName} đã bị Bầy Sói nguyền rủa và biến thành Sói!`);
     }
     
     const finalPrivateLogs = {};
