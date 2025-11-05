@@ -8,6 +8,7 @@ import { getDatabase, ServerValue } from 'firebase-admin/database';
 
 // --- BIẾN TOÀN CỤC (CACHE) ---
 let firebaseAdminApp;
+
 let rolesDataCache = null;
 let mechanicDataCache = null;
 let cacheTimestamp = 0;
@@ -311,9 +312,11 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
 }
 
 // --- 4. HÀM XỬ LÝ LOGIC GAME CỐT LÕI (THEO `Kind` MỚI) ---
-// ... (Toàn bộ phần còn lại của file (calculateNightStatus, applyNightResults, v.v.)
-// ...  giữ nguyên y hệt như file gốc bạn đã cung cấp) ...
 
+/**
+ * Tính toán kết quả cuối đêm dựa trên logic Kind mới.
+ * (ĐÃ CẬP NHẬT LOGIC SHIELD -> ARMOR -> SAVE)
+ */
 function calculateNightStatus(players, nightActions, allRolesData, currentNightNumber) {
     
     const livingPlayerIds = Object.keys(players).filter(pId => players[pId].isAlive);
@@ -330,24 +333,30 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         }
         const role = allRolesData[player.roleName] || allRolesData['Dân thường'] || { Faction: 'Phe Dân', Passive: '0', Kind: 'empty' };
         
+        // ===================================
+        // === BẢN VÁ: Đọc từ cấu trúc Dữ liệu mới ===
+        // ===================================
         const actionLog = [];
-        const action = nightActions[pId] || null;
+        const playerActions = nightActions[pId] || {};
+        const kindAction = playerActions.kind_action || null; // Đây là hành động cá nhân
+        const wolfBiteAction = playerActions.wolf_bite || null; // Đây là hành động cắn
         
-        if (action && action.action !== 'wolf_bite') {
-            const targetId = action.targetId;
+        // Ghi log cho hành động cá nhân (kindAction)
+        if (kindAction && kindAction.action !== 'wolf_bite') {
+            const targetId = kindAction.targetId;
             const targetUsername = targetId ? (players[targetId]?.username || '??') : 'Không ai';
             
-            if (action.choice === 'save') actionLog.push(`Bạn đã thử CỨU ${targetUsername}.`);
-            else if (action.choice === 'kill') actionLog.push(`Bạn đã thử GIẾT ${targetUsername}.`);
-            else if (action.action === 'assassin') actionLog.push(`Bạn đã ÁM SÁT ${targetUsername} (đoán là ${action.guessedRole || '??'}).`);
-            else if (action.action === 'curse') actionLog.push(action.choice === 'curse' ? 'Bạn đã chọn NGUYỀN RỦA mục tiêu Sói cắn.' : 'Bạn đã chọn KHÔNG NGUYỀN RỦA.');
+            if (kindAction.choice === 'save') actionLog.push(`Bạn đã thử CỨU ${targetUsername}.`);
+            else if (kindAction.choice === 'kill') actionLog.push(`Bạn đã thử GIẾT ${targetUsername}.`);
+            else if (kindAction.action === 'assassin') actionLog.push(`Bạn đã ÁM SÁT ${targetUsername} (đoán là ${kindAction.guessedRole || '??'}).`);
+            else if (kindAction.action === 'curse') actionLog.push(kindAction.choice === 'curse' ? 'Bạn đã chọn NGUYỀN RỦA mục tiêu Sói cắn.' : 'Bạn đã chọn KHÔNG NGUYỀN RỦA.');
             else if (targetId) actionLog.push(`Bạn đã dùng chức năng lên ${targetUsername}.`);
         }
         
+        // Ghi log cho hành động cắn (wolfBiteAction)
         if (role.Faction === wolfFaction) {
-             const wolfAction = nightActions[pId];
-             if (wolfAction && wolfAction.action === 'wolf_bite' && wolfAction.targetId) {
-                 actionLog.push(`Bạn đã vote cắn ${players[wolfAction.targetId].username}.`);
+             if (wolfBiteAction && wolfBiteAction.targetId) {
+                 actionLog.push(`Bạn đã vote cắn ${players[wolfBiteAction.targetId].username}.`);
              } else {
                  actionLog.push('Bạn đã không vote cắn.');
              }
@@ -361,17 +370,17 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             isSaved: false,    
             isDisabled: false, 
             isCursed: false,
-            // ===============================================
-            // === LOGIC MỚI ===
-            isLethallyWounded: false, // Cờ mới: Đánh dấu "sắp chết" (sau khi mất giáp)
-            // ===============================================
+            isLethallyWounded: false, 
             faction: player.faction || role.Faction, 
             role: role,
             passive: {},
-            action: action, 
+            action: kindAction, // Chỉ lưu hành động cá nhân vào đây
             state: player.state || {}, // Đây là state SẼ được cập nhật
             actionLog: actionLog.join(' '), 
         };
+        // ===================================
+        // === KẾT THÚC BẢN VÁ ===
+        // ===================================
         
         privateLogs[pId] = [];
         if (liveStatus[pId].actionLog) {
@@ -393,14 +402,21 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
     const wolfVotes = {};
     let wolfBiteTargetId = null;
     
+    // ===================================
+    // === BẢN VÁ: Đọc từ 'wolf_bite' ===
+    // ===================================
     livingPlayerIds
         .filter(pId => liveStatus[pId] && liveStatus[pId].faction === wolfFaction) 
         .forEach(wolfId => {
-            const action = nightActions[wolfId]; 
-            if (action && action.targetId) {
-                wolfVotes[action.targetId] = (wolfVotes[action.targetId] || 0) + 1;
+            const playerActions = nightActions[wolfId] || {};
+            const wolfBiteAction = playerActions.wolf_bite; // Đọc hành động cắn
+            if (wolfBiteAction && wolfBiteAction.targetId) {
+                wolfVotes[wolfBiteAction.targetId] = (wolfVotes[wolfBiteAction.targetId] || 0) + 1;
             }
         });
+    // ===================================
+    // === KẾT THÚC BẢN VÁ ===
+    // ===================================
 
     let maxVotes = 0;
     let tiedTargets = [];
@@ -426,7 +442,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const player = players[pId]; 
         if (!isActionActive(status, (player.state || {}), currentNightNumber)) return;
         
-        const action = status.action;
+        const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
+        if (!action) return; // Thêm kiểm tra null
         const targetId = action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
 
@@ -449,7 +466,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const player = players[pId];
         if (!isActionActive(status, (player.state || {}), currentNightNumber, true, true)) return; 
         
-        const action = status.action;
+        const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
+        if (!action) return; // Thêm kiểm tra null
         const targetId = action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
 
@@ -474,7 +492,9 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const player = players[pId];
         if (!isActionActive(status, (player.state || {}), currentNightNumber) || status.isDisabled) return;
 
-        const action = status.action;
+        const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
+        if (!action) return; // Thêm kiểm tra null
+        
         const targetId = action.targetId;
         
         if (status.role.Kind !== 'curse' && (!targetId || !liveStatus[targetId])) return;
@@ -529,12 +549,16 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const status = liveStatus[pId];
         const player = players[pId];
         if (status.isDisabled) return;
-        if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'kill') return;
+        
+        const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
+        if (!action) return; // Thêm kiểm tra null
+
+        if (status.role.Kind !== 'witch' || action.choice !== 'kill') return;
 
         if (status.state.witch_kill_used) return;
         if (!isActionActive(status, (player.state || {}), currentNightNumber, true, false)) return;
 
-        const targetId = status.action.targetId;
+        const targetId = action.targetId;
         if (liveStatus[targetId]) {
             liveStatus[targetId].damage++;
             status.state.witch_kill_used = true; // Cập nhật state TẠM THỜI
@@ -548,6 +572,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const status = liveStatus[pId];
         
         const player = players[pId];
+        
+        // Ghi chú: 'status.action' giờ là 'kindAction'
         if (status.action && isActionActive(status, (player.state || {}), currentNightNumber, false)) { 
             const activeRule = status.role.Active;
             if (activeRule !== 'n' && activeRule !== '0') {
@@ -578,12 +604,16 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const status = liveStatus[pId];
         const player = players[pId];
         if (status.isDisabled) return; 
-        if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'save') return;
+        
+        const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
+        if (!action) return; // Thêm kiểm tra null
+
+        if (status.role.Kind !== 'witch' || action.choice !== 'save') return;
         
         if (status.state.witch_save_used) return; // Đã dùng
         if (!isActionActive(status, (player.state || {}), currentNightNumber, true, false)) return; 
 
-        const targetId = status.action.targetId;
+        const targetId = action.targetId;
         if (!targetId || !liveStatus[targetId]) return;
 
         const targetStatus = liveStatus[targetId];
@@ -663,6 +693,8 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
 function isActionActive(status, playerState, currentNightNumber, checkReSelect = true, allowWhenDisabled = false) {
     const role = status.role;
     const state = playerState || {};
+    
+    // Ghi chú: 'status.action' giờ là 'kindAction'
     const action = status.action;
 
     if (!action) return false;
@@ -689,7 +721,7 @@ function isActionActive(status, playerState, currentNightNumber, checkReSelect =
     
     if (role.Kind === 'witch') {
          if (action.choice === 'save' && state.witch_save_used) return false;
-         if (action.choice === 'kill' && state.witch_save_used) return false; // Lỗi logic ở đây, phải là witch_kill_used
+         if (action.choice === 'kill' && state.witch_kill_used) return false;
     }
 
     return true;

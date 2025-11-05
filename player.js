@@ -1054,30 +1054,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const targets = Array.from(grid.querySelectorAll('.selected')).map(c => c.dataset.playerId);
                 
-                const actionData = { 
-                    action: kind, 
-                    targetId: (kind === 'wolf_bite' || quantity === 1) ? targets[0] : targets
+                // ===================================
+                // === BẢN VÁ: Phân tách 'wolf_bite' và 'kind_action' ===
+                // ===================================
+                const actionType = (kind === 'wolf_bite') ? 'wolf_bite' : 'kind_action';
+                const actionSubPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}/${actionType}`;
+
+                const target = (kind === 'wolf_bite' || quantity === 1) ? targets[0] : targets;
+                
+                const actionData = {
+                    action: kind, // 'kind' là 'wolf_bite', 'audit', 'kill', v.v.
+                    targetId: target || null
                 };
-                
+
                 if (targets.length === 0) {
-                     actionData.targetId = null;
+                    database.ref(actionSubPath).set(null); // Xóa hành động cụ thể này
+                } else {
+                    database.ref(actionSubPath).set(actionData);
                 }
-                
-                database.ref(`rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`).set(actionData);
+                // ===================================
+                // === KẾT THÚC BẢN VÁ ===
+                // ===================================
             });
             grid.appendChild(card);
         });
 
         container.appendChild(grid);
         
-        const nightActions = currentRoomData.nightActions?.[nightNum] || {};
+        // ===================================
+        // === BẢN VÁ: Đọc từ cấu trúc Dữ liệu mới ===
+        // ===================================
+        const allNightActions = currentRoomData.nightActions?.[nightNum] || {};
 
         if (kind === 'wolf_bite') {
             const wolfVotes = {};
             Object.keys(players).forEach(pId => {
-                if (players[pId].faction === 'Bầy Sói' && nightActions[pId]?.targetId) {
-                    const targetId = nightActions[pId].targetId;
-                    wolfVotes[targetId] = (wolfVotes[targetId] || 0) + 1;
+                if (players[pId].faction === 'Bầy Sói') {
+                    const playerAction = allNightActions[pId];
+                    // Đọc từ 'wolf_bite'
+                    if (playerAction?.wolf_bite?.targetId) {
+                        const targetId = playerAction.wolf_bite.targetId;
+                        wolfVotes[targetId] = (wolfVotes[targetId] || 0) + 1;
+                    }
                 }
             });
             
@@ -1089,16 +1107,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     countEl.textContent = wolfVotes[pId];
                     card.appendChild(countEl);
                 }
-                if (nightActions[myPlayerId]?.targetId === pId) {
+                // Đọc từ 'wolf_bite' cho lựa chọn của tôi
+                if (allNightActions[myPlayerId]?.wolf_bite?.targetId === pId) {
                     card.classList.add('selected');
                 }
             });
+
         } else {
-             if (nightActions[myPlayerId]?.action === kind) {
-                const myTarget = nightActions[myPlayerId].targetId;
-                grid.querySelector(`.target-card[data-player-id="${myTarget}"]`)?.classList.add('selected');
+             // Đọc từ 'kind_action'
+             const myKindAction = allNightActions[myPlayerId]?.kind_action;
+             if (myKindAction?.action === kind) {
+                const myTarget = myKindAction.targetId;
+                // Xử lý cả target là array (cho quantity > 1) hoặc string
+                const targets = Array.isArray(myTarget) ? myTarget : [myTarget];
+                targets.forEach(t => {
+                    grid.querySelector(`.target-card[data-player-id="${t}"]`)?.classList.add('selected');
+                });
              }
         }
+        // ===================================
+        // === KẾT THÚC BẢN VÁ ===
+        // ===================================
     }
 
     /**
@@ -1109,7 +1138,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const roomData = currentRoomData;
         
         const { panel, content, footer } = createActionPanel('Thuốc Phù thủy', 'Bạn có 1 bình Cứu và 1 bình Giết.', 'witch');
-        const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`;
+        
+        // === BẢN VÁ: Sửa actionPath ===
+        const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}/kind_action`;
+        // === KẾT THÚC BẢN VÁ ===
 
         const saveUsed = state.witch_save_used || false;
         const killUsed = state.witch_kill_used || false;
@@ -1133,7 +1165,10 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         
         const targetGrid = content.querySelector('#witch-target-grid');
-        const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId];
+        
+        // === BẢN VÁ: Sửa myAction ===
+        const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId]?.kind_action;
+        // === KẾT THÚC BẢN VÁ ===
         
         const renderWitchTargets = (choiceType) => {
             targetGrid.innerHTML = ''; 
@@ -1181,8 +1216,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const myPlayerData = roomData.players[myPlayerId] || {};
         
         const { panel, content } = createActionPanel('Ám Sát', 'Chọn mục tiêu, sau đó đoán vai trò.', 'assassin');
-        const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`;
-        const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId];
+        
+        // === BẢN VÁ: Sửa actionPath ===
+        const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}/kind_action`;
+        // === KẾT THÚC BẢN VÁ ===
+        
+        // === BẢN VÁ: Sửa myAction ===
+        const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId]?.kind_action;
+        // === KẾT THÚC BẢN VÁ ===
 
         const targetGrid = document.createElement('div');
         targetGrid.className = 'target-grid';
@@ -1264,7 +1305,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             btn.addEventListener('click', () => {
-                database.ref(`rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`).set({
+                // === BẢN VÁ: Sửa actionPath (cho Sát thủ) ===
+                database.ref(`rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}/kind_action`).set({
+                // === KẾT THÚC BẢN VÁ ===
                     action: 'assassin',
                     targetId: targetId,
                     guessedRole: roleName
@@ -1284,8 +1327,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const roomData = currentRoomData;
 
         const { panel, content } = createActionPanel('Nguyền Rủa', 'Bạn có muốn nguyền rủa mục tiêu Sói cắn đêm nay không?', 'curse');
-        const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}`;
-        const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId];
+        
+        // === BẢN VÁ: Sửa actionPath ===
+        const actionPath = `rooms/${currentRoomId}/nightActions/${nightNum}/${myPlayerId}/kind_action`;
+        // === KẾT THÚC BẢN VÁ ===
+        
+        // === BẢN VÁ: Sửa myAction ===
+        const myAction = roomData.nightActions?.[nightNum]?.[myPlayerId]?.kind_action;
+        // === KẾT THÚC BẢN VÁ ===
         
         content.innerHTML = `
             <div class="witch-choice-grid">
