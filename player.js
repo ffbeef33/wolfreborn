@@ -562,6 +562,14 @@ document.addEventListener('DOMContentLoaded', () => {
             hostGameplayControls.classList.add('hidden');
             hostDeleteRoomBtn.classList.remove('hidden'); 
             
+            // ===================================
+            // === SỬA LỖI NÚT RESET BẮT ĐẦU ===
+            // ===================================
+            hostStartGameBtn.classList.remove('hidden');
+            // ===================================
+            // === SỬA LỖI NÚT RESET KẾT THÚC ===
+            // ===================================
+            
             if (roleSelectionGrid && roleSelectionGrid.children.length === 0 && Object.keys(allRolesData).length > 0) {
                 renderRoleSelection();
             }
