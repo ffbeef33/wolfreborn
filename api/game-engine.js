@@ -10,8 +10,10 @@ import { getDatabase, ServerValue } from 'firebase-admin/database';
 let firebaseAdminApp;
 
 // *** SỬA LỖI: Quay lại dùng Singleton Pattern (như code cũ) cho Google API ***
-let googleAuth;
-let sheetsApi;
+// === CẬP NHẬT (11/2025): Bỏ Singleton Pattern cho sheetsApi/googleAuth ===
+// let googleAuth;
+// let sheetsApi;
+// (Đã xóa các biến toàn cục này)
 
 let rolesDataCache = null;
 let mechanicDataCache = null;
@@ -47,25 +49,35 @@ function getFirebaseAdmin() {
 }
 
 /**
- * Khởi tạo và trả về Google Sheets API (Singleton Pattern - Giống code cũ).
+ * Khởi tạo và trả về Google Sheets API.
+ * * === SỬA LỖI (11/2025) ===
+ * Bỏ Singleton Pattern (if (!sheetsApi)).
+ * Chúng ta PHẢI tạo một đối tượng auth mới MỖI LẦN hàm này được gọi
+ * (tức là mỗi khi cache 5 phút hết hạn) để đảm bảo 
+ * thư viện googleapis luôn lấy token OAuth 2 mới,
+ * tránh lỗi "invalid authentication credentials" trên Vercel.
  */
 async function getGoogleSheetsAPI() {
-    // *** SỬA LỖI: Quay lại dùng Singleton Pattern (như code cũ) ***
-    if (!sheetsApi) {
-        try {
-            const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
-            googleAuth = new google.auth.GoogleAuth({
-                credentials,
-                scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
-            });
-            sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
-        } catch (e) {
-            console.error("Lỗi Khởi Tạo Google Sheets API:", e);
-            throw new Error("Không thể khởi tạo Google Sheets API.");
-        }
+    try {
+        const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+        
+        // Tạo đối tượng auth mới mỗi lần
+        const googleAuth = new google.auth.GoogleAuth({
+            credentials,
+            scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
+        });
+        
+        // Tạo đối tượng sheets mới mỗi lần
+        const sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        
+        return sheetsApi; // Trả về đối tượng mới
+        
+    } catch (e) {
+        console.error("Lỗi Khởi Tạo Google Sheets API:", e);
+        throw new Error("Không thể khởi tạo Google Sheets API.");
     }
-    return sheetsApi;
 }
+
 
 // --- 2. HÀM TRUY CẬP DỮ LIỆU (Với Cache) ---
 
@@ -83,7 +95,8 @@ export async function fetchSheetData(sheetName) {
     }
 
     try {
-        // *** SỬA LỖI: Gọi hàm getGoogleSheetsAPI() (phiên bản singleton) ***
+        // === CẬP NHẬT (11/2025) ===
+        // Gọi hàm getGoogleSheetsAPI() (phiên bản đã sửa lỗi)
         const sheets = await getGoogleSheetsAPI(); 
         const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
@@ -161,9 +174,6 @@ export async function gameLoop(roomId) {
     const roomData = roomSnapshot.val();
     const state = roomData.gameState;
     
-    // =======================================================
-    // === SỬA LỖI LOG: Thêm kiểm tra phase "PROCESSING..." (Cái "Khóa")
-    // =======================================================
     if (!state || state.phase === 'waiting' || state.phase === 'GAME_END' || state.phase.startsWith('PROCESSING_')) {
         return `Phòng ${roomId} không cần xử lý (phase: ${state?.phase}).`;
     }
@@ -179,10 +189,6 @@ export async function gameLoop(roomId) {
 
     // --- HẾT GIỜ: XỬ LÝ CHUYỂN PHASE ---
     
-    // =======================================================
-    // === SỬA LỖI LOG: Đặt "Khóa" (Lock)
-    // =======================================================
-    // Cập nhật phase sang "ĐANG XỬ LÝ..." ngay lập tức để ngăn gameLoop/skip-phase chạy lại
     try {
         await db.ref(`rooms/${roomId}/gameState`).update({
             phase: `PROCESSING_${state.phase}`,
@@ -193,9 +199,6 @@ export async function gameLoop(roomId) {
         console.error(`Không thể set lock cho phòng ${roomId}:`, lockError);
         return `Phòng ${roomId} không thể set lock.`;
     }
-    // =======================================================
-    // === KẾT THÚC SỬA LỖI ===
-    // =======================================================
     
     let allRolesData;
     let phaseTimes;
@@ -204,7 +207,6 @@ export async function gameLoop(roomId) {
         allRolesData = await fetchSheetData('Roles');
     } catch (e) {
         console.error(`!!! LỖI NGHIÊM TRỌNG KHI TẢI 'Roles' SHEET (Phòng ${roomId}):`, e.message);
-        // Mở khóa nếu lỗi
         await setGamePhase(roomId, state.phase, state.duration, state.nightNumber); 
         throw new Error(`Không thể tải dữ liệu 'Roles': ${e.message}`);
     }
@@ -217,7 +219,6 @@ export async function gameLoop(roomId) {
         phaseTimes = {}; 
     }
 
-    // Đảm bảo key khớp với Google Sheet (viết hoa)
     const safePhaseTimes = {
         'NGÀY': phaseTimes['NGÀY'] || 180,
         'ĐÊM': phaseTimes['ĐÊM'] || 90, 
@@ -225,12 +226,10 @@ export async function gameLoop(roomId) {
         'DAY_1_INTRO': phaseTimes['DAY_1_INTRO'] || 15 
     };
     
-    // *** SỬA LỖI: Phải dùng try...catch để nếu lỗi thì mở khóa phase
     try {
         switch (state.phase) {
             
             case 'DAY_1_INTRO':
-                // Hết 15s giới thiệu, vào Đêm 1
                 await setGamePhase(roomId, 'NIGHT', safePhaseTimes['ĐÊM'], 1);
                 break;
 
@@ -246,18 +245,15 @@ export async function gameLoop(roomId) {
                     await announceWinner(roomId, winConditionAfterNight.winner);
                     await setGamePhase(roomId, 'GAME_END', 99999, state.nightNumber);
                 } else {
-                    // Nếu game chưa kết thúc, chuyển sang Thảo luận
                     await setGamePhase(roomId, 'DAY_DISCUSS', safePhaseTimes['NGÀY'], state.nightNumber);
                 }
                 break;
 
             case 'DAY_DISCUSS':
-                // Hết giờ thảo luận, chuyển sang Biểu Quyết
                 await setGamePhase(roomId, 'VOTE', safePhaseTimes['BIỂU QUYẾT'], state.nightNumber);
                 break;
 
             case 'VOTE':
-                // Hết giờ Vote, xử lý logic vote
                 const votes = roomData.votes?.[state.nightNumber] || {};
                 const voteResults = calculateVoteResults(roomData.players, votes);
                 
@@ -268,7 +264,6 @@ export async function gameLoop(roomId) {
                     await announceWinner(roomId, winCondition.winner);
                     await setGamePhase(roomId, 'GAME_END', 99999, state.nightNumber);
                 } else {
-                    // Bắt đầu đêm tiếp theo
                     const nextNight = (state.nightNumber || 1) + 1;
                     await setGamePhase(roomId, 'NIGHT', safePhaseTimes['ĐÊM'], nextNight);
                 }
@@ -276,7 +271,6 @@ export async function gameLoop(roomId) {
         }
     } catch (processError) {
         console.error(`Lỗi nghiêm trọng khi xử lý phase ${state.phase} cho phòng ${roomId}:`, processError);
-        // *** SỬA LỖI: Mở khóa phase nếu có lỗi
         await setGamePhase(roomId, state.phase, state.duration, state.nightNumber);
     }
     
@@ -305,6 +299,7 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
 
 /**
  * Tính toán kết quả cuối đêm dựa trên logic Kind mới.
+ * (ĐÃ CẬP NHẬT LOGIC SHIELD -> ARMOR -> SAVE)
  */
 function calculateNightStatus(players, nightActions, allRolesData, currentNightNumber) {
     
@@ -352,12 +347,16 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             isProtected: false, 
             isSaved: false,    
             isDisabled: false, 
-            isCursed: false,   
+            isCursed: false,
+            // ===============================================
+            // === LOGIC MỚI ===
+            isLethallyWounded: false, // Cờ mới: Đánh dấu "sắp chết" (sau khi mất giáp)
+            // ===============================================
             faction: player.faction || role.Faction, 
             role: role,
             passive: {},
             action: action, 
-            state: player.state || {},
+            state: player.state || {}, // Đây là state SẼ được cập nhật
             actionLog: actionLog.join(' '), 
         };
         
@@ -366,24 +365,15 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             privateLogs[pId].push(liveStatus[pId].actionLog);
         }
         
-        // --- *** BẮT ĐẦU SỬA ĐỔI (Đọc PassiveKind) *** ---
-        // (Giả sử tên cột trong Google Sheet của bạn là 'PassiveKind')
         if (role.Passive === "1" && role.PassiveKind && role.PassiveKind !== 'none') {
             if (role.PassiveKind === 'armor') {
-                
-                // ===============================================
-                // === SỬA LỖI ARMOR (Dòng 464) ===
-                // *** Sửa logic: Chỉ reset về 2 khi state là null/undefined (đầu game) ***
                 const armorLeft = player.state?.armorLeft;
                 liveStatus[pId].passive.armor = (armorLeft === null || armorLeft === undefined) ? 2 : armorLeft;
-                // ===============================================
-
             }
             if (role.PassiveKind === 'counteraudit') {
                 liveStatus[pId].passive.counteraudit = true;
             }
         }
-        // --- *** KẾT THÚC SỬA ĐỔI *** ---
     });
 
     // 2. Xử lý Sói Cắn (Xác định mục tiêu)
@@ -453,7 +443,6 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (status.role.Kind === 'audit') {
             const targetStatus = liveStatus[targetId];
             let resultFaction = targetStatus.faction;
-            // *** ĐỌC TỪ liveStatus.passive (ĐÃ SỬA Ở BƯỚC 1) ***
             if (targetStatus.passive.counteraudit) {
                 if (resultFaction === wolfFaction) resultFaction = "Phe Dân";
                 else if (resultFaction === "Phe Dân") resultFaction = wolfFaction;
@@ -521,38 +510,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         }
     }
 
-    // --- Ưu tiên 5: Cứu (Witch Save) ---
-    livingPlayerIds.forEach(pId => {
-        if (!liveStatus[pId]) return;
-        const status = liveStatus[pId];
-        const player = players[pId];
-        if (status.isDisabled) return; 
-        if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'save') return;
-        
-        if (status.state.witch_save_used) return;
-        if (!isActionActive(status, (player.state || {}), currentNightNumber, true, false)) return; 
-
-        const targetId = status.action.targetId;
-        if (!targetId || !liveStatus[targetId]) return;
-
-        const targetStatus = liveStatus[targetId];
-        
-        // ===============================================
-        // === SỬA LỖI ARMOR (Dòng 644) ===
-        // *** Sửa logic: Dùng ?? (nullish) thay vì || (or) để 0 vẫn là 0 ***
-        const armor = targetStatus.passive.armor ?? 1;
-        // ===============================================
-
-        if (targetStatus.damage >= armor && !targetStatus.isProtected) {
-            targetStatus.isSaved = true;
-            status.state.witch_save_used = true; 
-            if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã cứu sống ${players[targetId].username} thành công. Bạn mất bình Cứu.`);
-        } else {
-            if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã dùng thuốc Cứu cho ${players[targetId].username} nhưng họ không chết. Bạn vẫn còn bình Cứu.`);
-        }
-    });
-
-    // --- Ưu tiên 6: Giết (Witch Kill) ---
+    // --- Ưu tiên 5: Giết (Witch Kill) ---
     livingPlayerIds.forEach(pId => {
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
@@ -566,12 +524,67 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const targetId = status.action.targetId;
         if (liveStatus[targetId]) {
             liveStatus[targetId].damage++;
-            status.state.witch_kill_used = true; 
+            status.state.witch_kill_used = true; // Cập nhật state TẠM THỜI
             if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã dùng thuốc Giết lên ${players[targetId].username}. Bạn mất bình Giết.`);
         }
     });
 
-    // --- 6. Tổng kết kết quả ---
+    // --- Ưu tiên 6: Giai đoạn 1 (Xử lý Khiên & Giáp) ---
+    livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
+        const status = liveStatus[pId];
+        
+        const player = players[pId];
+        if (status.action && isActionActive(status, (player.state || {}), currentNightNumber, false)) { 
+            const activeRule = status.role.Active;
+            if (activeRule !== 'n' && activeRule !== '0') {
+                const activeLeft = (parseInt(status.state.activeLeft ?? activeRule)) - 1;
+                status.state.activeLeft = activeLeft;
+            }
+        }
+        if (status.action && status.action.targetId) {
+            status.state.lastTargetId = status.action.targetId;
+        }
+
+        if (status.damage > 0 && !status.isProtected) {
+            
+            const armor = status.passive.armor ?? 1; 
+
+            if (armor > 1) {
+                status.state.armorLeft = armor - 1;
+            } else {
+                status.state.armorLeft = 0; 
+                status.isLethallyWounded = true; // Đánh dấu "sắp chết"
+            }
+        }
+    });
+
+    // --- Ưu tiên 7: Giai đoạn 2 (Xử lý Cứu - Witch Save) ---
+    livingPlayerIds.forEach(pId => {
+        if (!liveStatus[pId]) return;
+        const status = liveStatus[pId];
+        const player = players[pId];
+        if (status.isDisabled) return; 
+        if (status.role.Kind !== 'witch' || !status.action || status.action.choice !== 'save') return;
+        
+        if (status.state.witch_save_used) return; // Đã dùng
+        if (!isActionActive(status, (player.state || {}), currentNightNumber, true, false)) return; 
+
+        const targetId = status.action.targetId;
+        if (!targetId || !liveStatus[targetId]) return;
+
+        const targetStatus = liveStatus[targetId];
+        
+        if (targetStatus.isLethallyWounded) {
+            targetStatus.isSaved = true; // Cứu thành công
+            status.state.witch_save_used = true; // Mất bình Cứu
+            if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã cứu sống ${players[targetId].username} thành công. Bạn mất bình Cứu.`);
+        } else {
+            if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã dùng thuốc Cứu cho ${players[targetId].username} nhưng họ không chết. Bạn vẫn còn bình Cứu.`);
+        }
+    });
+
+    // --- Ưu tiên 8: Giai đoạn 3 (Tổng kết Cái chết & Biến đổi) ---
     const nightResults = {
         deaths: [], 
         stateUpdates: {}, 
@@ -584,59 +597,17 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         const status = liveStatus[pId];
         const player = players[pId];
         
-        const newState = { ...status.state }; 
+        const newState = { ...status.state };
         
-        // (Dòng 674-676 gốc đã được xóa ở lần trước)
-        
-        if (status.state.witch_save_used) newState.witch_save_used = true;
-        if (status.state.witch_kill_used) newState.witch_kill_used = true;
-
-        if (status.action && isActionActive(status, (player.state || {}), currentNightNumber, false)) { 
-            const activeRule = status.role.Active;
-            if (activeRule !== 'n' && activeRule !== '0') {
-                const activeLeft = (parseInt(newState.activeLeft ?? activeRule)) - 1;
-                newState.activeLeft = activeLeft;
-            }
-        }
-        
-        if (status.action && status.action.targetId) {
-            newState.lastTargetId = status.action.targetId;
-        }
-        
-        if (status.damage > 0 && !status.isProtected && !status.isSaved) {
-            
-            // ===============================================
-            // === SỬA LỖI ARMOR (Dòng 702) ===
-            // *** Sửa logic: Dùng ?? (nullish) thay vì || (or) để 0 vẫn là 0 ***
-            if (status.passive.armor && status.passive.armor > 1) {
-            // ===============================================
-                
-                // (Dòng này đã được sửa ở lần 1)
-                newState.armorLeft = status.passive.armor - 1;
-
-                // ===============================================
-                // === SỬA LỖI (THEO YÊU CẦU): Xóa log Giáp
-                // ===============================================
-                // if (privateLogs[pId]) privateLogs[pId].push("Bạn đã bị tấn công nhưng Giáp đã đỡ."); // <-- ĐÃ XÓA DÒNG NÀY
-                // ===============================================
-                
-            } else {
-                
-                // ===============================================
-                // === SỬA LỖI ARMOR (Dòng 712) ===
-                // *** Gán thẳng = 0 (logic này đúng khi kết hợp với logic Dòng 464 đã sửa) ***
-                newState.armorLeft = 0; 
-                // ===============================================
-
-                status.isAlive = false; 
-                nightResults.deaths.push({
-                    id: pId,
-                    username: player.username,
-                    roleName: player.roleName,
-                    cause: (pId === wolfBiteTargetId && !status.isCursed) ? 'Bầy Sói' : 'Chức năng'
-                });
-                if (privateLogs[pId]) privateLogs[pId].push('Bạn đã CHẾT!');
-            }
+        if (status.isLethallyWounded && !status.isSaved) {
+            status.isAlive = false; 
+            nightResults.deaths.push({
+                id: pId,
+                username: player.username,
+                roleName: player.roleName,
+                cause: (pId === wolfBiteTargetId && !status.isCursed) ? 'Bầy Sói' : 'Chức năng'
+            });
+            if (privateLogs[pId]) privateLogs[pId].push('Bạn đã CHẾT!');
         }
         
         nightResults.stateUpdates[pId] = newState; // Ghi lại newState (đã cập nhật)
@@ -669,12 +640,6 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         finalPrivateLogs[pId] = privateLogs[pId].join('\n');
     });
 
-    // =======================================================
-    // === SỬA LỖI LOG: Tách riêng publicAnnouncement ra khỏi results
-    // =======================================================
-    // Hàm này trả về 2 phần:
-    // 1. nightResults (deaths, stateUpdates) -> Dùng để CẬP NHẬT Firebase
-    // 2. publicAnnouncement -> Dùng để GHI LOG (và sẽ không bị ghi đè)
     return { ...nightResults, publicAnnouncement: publicAnnouncement.join(' '), privateLogs: finalPrivateLogs };
 }
 
@@ -684,7 +649,6 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
  */
 function isActionActive(status, playerState, currentNightNumber, checkReSelect = true, allowWhenDisabled = false) {
     const role = status.role;
-    // *** SỬA LỖI 500: Đảm bảo state không bao giờ là null ***
     const state = playerState || {};
     const action = status.action;
 
@@ -697,7 +661,6 @@ function isActionActive(status, playerState, currentNightNumber, checkReSelect =
 
     if (role.Active === '0') return false; 
     if (role.Active !== 'n') {
-        // *** SỬA LỖI 500: Đọc từ state (đã an toàn) ***
         const activeLeft = (parseInt(state.activeLeft ?? role.Active)); 
         if (activeLeft <= 0) return false; 
     }
@@ -745,10 +708,6 @@ async function applyNightResults(roomId, results, nightNumber) {
 
     const timestamp = ServerValue.TIMESTAMP;
     
-    // =======================================================
-    // === SỬA LỖI LOG: `publicMsg` được lấy từ `results`
-    // (Vì `results` được tính toán 1 lần duy nhất, log sẽ luôn ĐÚNG)
-    // =======================================================
     const publicMsg = results.publicAnnouncement; 
 
     const allPlayerIds = Object.keys(await (await roomRef.child('players').once('value')).val());
@@ -860,10 +819,9 @@ async function checkWinCondition(roomId) {
     let villagerCount = 0;
     let thirdPartyCount = 0;
 
-    // *** SỬA LỖI: Đảm bảo players tồn tại trước khi dùng Object.values ***
     if (!players) {
         console.error(`Lỗi checkWinCondition: Không tìm thấy players trong phòng ${roomId}`);
-        return { isEnd: false, winner: null }; // Không thể xác định, game tiếp tục
+        return { isEnd: false, winner: null }; 
     }
 
     Object.values(players).forEach(p => {
@@ -898,7 +856,6 @@ async function announceWinner(roomId, winnerFaction) {
      const playersSnapshot = await db.ref(`rooms/${roomId}/players`).once('value');
      const players = playersSnapshot.val();
 
-     // *** SỬA LỖI: Đảm bảo players tồn tại ***
      if (!players) {
          console.error(`Lỗi announceWinner: Không tìm thấy players trong phòng ${roomId}`);
          return;
