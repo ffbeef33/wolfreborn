@@ -67,6 +67,7 @@ async function getGoogleSheetsAPI_local() {
 
 /**
  * [CỤC BỘ] Đọc và cache dữ liệu từ Google Sheet.
+ * (ĐÃ THÊM DEBUG LOGGING)
  */
 async function fetchSheetData_local(sheetName) {
     const now = Date.now();
@@ -75,9 +76,28 @@ async function fetchSheetData_local(sheetName) {
         return rolesDataCache;
     }
 
+    // === BƯỚC DEBUG: Khai báo biến trước khi try-catch ===
+    let spreadsheetId = process.env.GOOGLE_SHEET_ID || "CHƯA XÁC ĐỊNH";
+    let clientEmail = "CHƯA XÁC ĐỊNH";
+    // === KẾT THÚC DEBUG ===
+
     try {
+        // === BƯỚC DEBUG: Lấy thông tin email từ credentials ===
+        try {
+            const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+            clientEmail = credentials.client_email;
+        } catch (e) {
+            console.error("[HOST-ACTIONS DEBUG] Không thể parse GOOGLE_SERVICE_ACCOUNT_CREDENTIALS.");
+        }
+        // === KẾT THÚC DEBUG ===
+
         const sheets = await getGoogleSheetsAPI_local(); 
-        const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+        spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+        // === BƯỚC DEBUG: In thông tin trước khi gọi ===
+        console.log(`[HOST-ACTIONS DEBUG] Đang thử đọc Sheet ID: ${spreadsheetId}`);
+        console.log(`[HOST-ACTIONS DEBUG] Sử dụng Service Account: ${clientEmail}`);
+        // === KẾT THÚC DEBUG ===
 
         const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: sheetName });
         const rows = res.data.values;
@@ -108,7 +128,13 @@ async function fetchSheetData_local(sheetName) {
         }
 
     } catch (error) {
-        console.error(`Lỗi khi đọc sheet ${sheetName} (host-actions local):`, error);
+        console.error(`Lỗi khi đọc sheet ${sheetName} (host-actions local):`, error.message);
+        
+        // === BƯỚC DEBUG: In lại thông tin khi gặp lỗi ===
+        console.error(`[HOST-ACTIONS DEBUG] GẶP LỖI VỚI Sheet ID: ${spreadsheetId}`);
+        console.error(`[HOST-ACTIONS DEBUG] GẶP LỖI VỚI Service Account: ${clientEmail}`);
+        // === KẾT THÚC DEBUG ===
+        
         // Trả về cache cũ nếu có lỗi, nếu không thì ném lỗi
         if (sheetName === 'Roles' && rolesDataCache) return rolesDataCache;
         throw error;
