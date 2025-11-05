@@ -1,14 +1,23 @@
 // File: /api/host-actions.js
 // Xử lý tất cả hành động của Host (Tạo, Tham gia, Start, Kick...)
+// === CẬP NHẬT (11/2025): Đã sao chép logic đọc Google Sheet vào file này ===
+// === để sửa lỗi "invalid authentication credentials" một cách triệt để ===
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getDatabase, ServerValue } from 'firebase-admin/database';
-import { fetchSheetData, setGamePhase } from './game-engine.js'; 
+// Import logic Google Sheets trực tiếp
+import { google } from 'googleapis';
+// Import setGamePhase từ game-engine (vẫn cần cái này)
+import { setGamePhase } from './game-engine.js'; 
+
+// --- BIẾN CACHE CỤC BỘ (CHỈ CHO FILE NÀY) ---
+let rolesDataCache = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 phút
 
 // --- 1. KHỞI TẠO FIREBASE ADMIN (Singleton Pattern) ---
 let firebaseAdminApp;
 function getFirebaseAdmin() {
-    // Đặt tên riêng cho instance này để tránh xung đột
     const APP_NAME = 'firebaseAdminHostActions';
     
     if (getApps().find(app => app.name === APP_NAME)) {
@@ -20,7 +29,7 @@ function getFirebaseAdmin() {
             firebaseAdminApp = initializeApp({
                 credential: cert(serviceAccount),
                 databaseURL: databaseURL,
-            }, APP_NAME); // Đặt tên riêng
+            }, APP_NAME);
         } catch (e) {
             console.error("Lỗi Khởi Tạo Firebase Admin SDK (host-actions):", e);
             throw new Error("Không thể khởi tạo Firebase Admin SDK.");
@@ -29,10 +38,87 @@ function getFirebaseAdmin() {
     return firebaseAdminApp;
 }
 
+// --- LOGIC GOOGLE SHEET (ĐÃ SỬA LỖI) ĐƯỢC SAO CHÉP VÀO ĐÂY ---
+
+/**
+ * [CỤC BỘ] Khởi tạo và trả về Google Sheets API.
+ * Luôn tạo đối tượng auth mới mỗi lần gọi để lấy token OAuth 2 mới.
+ */
+async function getGoogleSheetsAPI_local() {
+    try {
+        const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+        
+        // Tạo đối tượng auth mới mỗi lần
+        const googleAuth = new google.auth.GoogleAuth({
+            credentials,
+            scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
+        });
+        
+        // Tạo đối tượng sheets mới mỗi lần
+        const sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        
+        return sheetsApi; // Trả về đối tượng mới
+        
+    } catch (e) {
+        console.error("Lỗi Khởi Tạo Google Sheets API (host-actions local):", e);
+        throw new Error("Không thể khởi tạo Google Sheets API.");
+    }
+}
+
+/**
+ * [CỤC BỘ] Đọc và cache dữ liệu từ Google Sheet.
+ */
+async function fetchSheetData_local(sheetName) {
+    const now = Date.now();
+    // Kiểm tra cache CỤC BỘ
+    if (sheetName === 'Roles' && rolesDataCache && (now - cacheTimestamp < CACHE_DURATION)) {
+        return rolesDataCache;
+    }
+
+    try {
+        const sheets = await getGoogleSheetsAPI_local(); 
+        const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: sheetName });
+        const rows = res.data.values;
+
+        if (!rows || rows.length <= 1) {
+            throw new Error(`Không tìm thấy dữ liệu hoặc chỉ có tiêu đề trong sheet: ${sheetName}`);
+        }
+
+        const headers = rows[0].map(h => h.trim());
+        const data = rows.slice(1);
+
+        // Chỉ xử lý 'Roles' vì đây là file host-actions
+        if (sheetName === 'Roles') {
+            const rolesObj = {};
+            data.forEach(row => {
+                const role = {};
+                headers.forEach((header, index) => {
+                    role[header] = (row[index] !== undefined && row[index] !== null) ? String(row[index]) : '';
+                });
+                
+                if (role.RoleName && role.RoleName.trim() !== "") {
+                    rolesObj[role.RoleName.trim()] = role;
+                }
+            });
+            rolesDataCache = rolesObj; // Lưu vào cache CỤC BỘ
+            cacheTimestamp = now;
+            return rolesDataCache;
+        }
+
+    } catch (error) {
+        console.error(`Lỗi khi đọc sheet ${sheetName} (host-actions local):`, error);
+        // Trả về cache cũ nếu có lỗi, nếu không thì ném lỗi
+        if (sheetName === 'Roles' && rolesDataCache) return rolesDataCache;
+        throw error;
+    }
+}
+
+
 // --- 2. HÀM XỬ LÝ CHÍNH ---
 export default async function handler(request, response) {
-    // Cấu hình CORS
-    response.setHeader('Access-Control-Allow-Origin', '*'); // Hoặc domain của bạn
+    response.setHeader('Access-Control-Allow-Origin', '*'); 
     response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -44,7 +130,6 @@ export default async function handler(request, response) {
         return response.status(405).json({ success: false, message: 'Method Not Allowed' });
     }
 
-    // Tách 'roles' ra khỏi đây vì nó không còn được dùng từ body
     const { action, username, roomId, password, isPrivate, playerId } = request.body;
 
     try {
@@ -53,9 +138,8 @@ export default async function handler(request, response) {
         // --- 3. PHÂN LUỒNG HÀNH ĐỘNG ---
         switch (action) {
             
-            // === TẠO PHÒNG ===
             case 'create-room': {
-                const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 ký tự
+                const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase(); 
                 const hostPlayerId = `player_${Math.random().toString(36).substring(2, 9)}`;
 
                 const newRoomData = {
@@ -78,7 +162,7 @@ export default async function handler(request, response) {
                         }
                     },
                     gameSettings: {
-                        roles: [] // Host sẽ cập nhật sau
+                        roles: [] 
                     }
                 };
 
@@ -86,7 +170,6 @@ export default async function handler(request, response) {
                 return response.status(201).json({ success: true, roomId: newRoomId });
             }
             
-            // === THAM GIA PHÒNG ===
             case 'join-room': {
                 const roomRef = db.ref(`rooms/${roomId}`);
                 const snapshot = await roomRef.once('value');
@@ -95,18 +178,12 @@ export default async function handler(request, response) {
                 }
                 const roomData = snapshot.val();
 
-                // --- *** LOGIC RECONNECT ĐÃ SỬA *** ---
-
-                // 1. Kiểm tra xem người chơi đã ở trong phòng (đang reconnect)
                 const playerExists = Object.values(roomData.players).some(p => p.username === username);
 
                 if (playerExists) {
-                    // Người chơi này đang kết nối lại (reconnecting).
-                    // Không cần kiểm tra phase hay mật khẩu, chỉ cần cho họ vào.
                     return response.status(200).json({ success: true, roomId: roomId });
                 }
 
-                // 2. Nếu không, đây là người chơi MỚI. Áp dụng logic cũ.
                 if (roomData.gameState.phase !== 'waiting') {
                     throw new Error('Game đã bắt đầu, không thể tham gia.');
                 }
@@ -156,6 +233,7 @@ export default async function handler(request, response) {
 
                     case 'start-game':
                         const rolesFromSettings = gameSettings.roles || []; 
+                        // SỬ DỤNG HÀM CỤC BỘ (ĐÃ SỬA LỖI)
                         await handleStartGame(db, roomId, players, rolesFromSettings); 
                         return response.status(200).json({ success: true, message: 'Game đã bắt đầu.' });
                         
@@ -164,7 +242,6 @@ export default async function handler(request, response) {
                         return response.status(200).json({ success: true, message: 'Đã skip phase.' });
 
                     case 'end-game':
-                        // *** ĐÃ SỬA: Gọi hàm dọn dẹp mới ***
                         await cleanupAndEndGame(db, roomId, players);
                         return response.status(200).json({ success: true, message: 'Đã kết thúc game.' });
                     
@@ -188,6 +265,7 @@ export default async function handler(request, response) {
 
     } catch (error) {
         console.error(`Lỗi API /api/host-actions (action: ${action}):`, error);
+        // Trả về 400 (Bad Request) thay vì 500, vì lỗi này thường do Google Auth
         return response.status(400).json({ success: false, message: error.message });
     }
 }
@@ -196,7 +274,7 @@ export default async function handler(request, response) {
 
 /**
  * Xử lý logic khi Host bắt đầu game
- * *** ĐÃ SỬA LỖI: Thêm dọn dẹp state và originalRoleName ***
+ * (Sử dụng hàm fetchSheetData_local)
  */
 async function handleStartGame(db, roomId, players, rolesToAssign) {
     const playerIds = Object.keys(players);
@@ -207,7 +285,9 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
     if (!rolesToAssign || rolesToAssign.length === 0) throw new Error('Host chưa chọn vai trò.');
     if (playerCount !== rolesToAssign.length) throw new Error(`Số người chơi (${playerCount}) không khớp số vai trò (${rolesToAssign.length}).`);
     
-    const allRolesData = await fetchSheetData('Roles'); 
+    // SỬ DỤNG HÀM CỤC BỘ (ĐÃ SỬA LỖI)
+    const allRolesData = await fetchSheetData_local('Roles'); 
+    
     const hasWolf = rolesToAssign.some(roleName => allRolesData[roleName]?.Faction === 'Bầy Sói');
     if (!hasWolf) throw new Error('Game phải có tối thiểu 1 vai trò thuộc Bầy Sói.');
 
@@ -224,11 +304,8 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
         updates[`/players/${pId}/roleName`] = assignedRoleName;
         updates[`/players/${pId}/faction`] = roleData.Faction || 'Phe Dân'; 
         updates[`/players/${pId}/isAlive`] = true;
-        
-        // *** BẮT ĐẦU SỬA LỖI (Dọn dẹp state) ***
         updates[`/players/${pId}/state`] = {}; 
         updates[`/players/${pId}/originalRoleName`] = null; 
-        // *** KẾT THÚC SỬA LỖI ***
     });
 
     // 3. Bắt đầu phase đầu tiên (DAY_1_INTRO)
@@ -247,7 +324,6 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 
 /**
  * Xử lý logic Reset / Restart
- * *** ĐÃ SỬA LỖI: Thêm dọn dẹp state và originalRoleName ***
  */
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
@@ -260,11 +336,8 @@ async function resetGame(db, roomId, keepRoles) {
     Object.keys(roomData.players).forEach(pId => {
         updates[`/players/${pId}/isAlive`] = true;
         updates[`/players/${pId}/causeOfDeath`] = null;
-        
-        // *** BẮT ĐẦU SỬA LỖI (Dọn dẹp state) ***
         updates[`/players/${pId}/state`] = {};
         updates[`/players/${pId}/originalRoleName`] = null; 
-        // *** KẾT THÚC SỬA LỖI ***
         
         if (!keepRoles) { 
              updates[`/players/${pId}/roleName`] = null;
@@ -286,7 +359,7 @@ async function resetGame(db, roomId, keepRoles) {
         updates['/gameState/phase'] = 'waiting';
         updates['/gameState/startTime'] = ServerValue.TIMESTAMP; 
         updates['/gameState/duration'] = 99999;
-        updates['/gameSettings/roles'] = []; // Dọn dẹp vai trò (theo yêu cầu của bạn)
+        updates['/gameSettings/roles'] = [];
     }
     
     await db.ref(`rooms/${roomId}`).update(updates);
@@ -294,26 +367,19 @@ async function resetGame(db, roomId, keepRoles) {
 
 /**
  * Dọn dẹp state của người chơi và kết thúc game
- * *** ĐÃ SỬA LỖI: Thêm dọn dẹp state và originalRoleName ***
  */
 async function cleanupAndEndGame(db, roomId, players) {
     const updates = {};
     
-    // Dọn dẹp state của tất cả người chơi
     if (players) {
         Object.keys(players).forEach(pId => {
-            // *** BẮT ĐẦU SỬA LỖI (Dọn dẹp state) ***
             updates[`/players/${pId}/state`] = {};
             updates[`/players/${pId}/originalRoleName`] = null;
-            // *** KẾT THÚC SỬA LỖI ***
         });
     }
     
-    // Xóa các actions
     updates['/nightActions'] = null;
     updates['/votes'] = null;
-
-    // Đặt phase
     updates['/gameState/phase'] = 'GAME_END';
     updates['/gameState/startTime'] = ServerValue.TIMESTAMP;
     updates['/gameState/duration'] = 99999;
