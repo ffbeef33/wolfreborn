@@ -1,7 +1,6 @@
 // File: /api/host-actions.js
 // Xử lý tất cả hành động của Host (Tạo, Tham gia, Start, Kick...)
-// === CẬP NHẬT (11/2025): Đã sao chép logic đọc Google Sheet vào file này ===
-// === để sửa lỗi "invalid authentication credentials" một cách triệt để ===
+// === CẬP NHẬT: Thay đổi phương thức xác thực sang google.auth.fromJSON ===
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getDatabase, ServerValue } from 'firebase-admin/database';
@@ -40,34 +39,35 @@ function getFirebaseAdmin() {
 
 // --- LOGIC GOOGLE SHEET (ĐÃ SỬA LỖI) ĐƯỢC SAO CHÉP VÀO ĐÂY ---
 
+// === BẢN VÁ: Thay đổi cách xác thực ===
 /**
  * [CỤC BỘ] Khởi tạo và trả về Google Sheets API.
- * Luôn tạo đối tượng auth mới mỗi lần gọi để lấy token OAuth 2 mới.
+ * (Sử dụng google.auth.fromJSON)
  */
 async function getGoogleSheetsAPI_local() {
     try {
         const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
         
-        // Tạo đối tượng auth mới mỗi lần
-        const googleAuth = new google.auth.GoogleAuth({
-            credentials,
-            scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
-        });
+        // Sử dụng phương thức fromJSON
+        const auth = google.auth.fromJSON(credentials);
+        auth.scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
         
-        // Tạo đối tượng sheets mới mỗi lần
-        const sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        // Tạo đối tượng sheets với auth đã được chỉ định scope
+        const sheetsApi = google.sheets({ version: 'v4', auth: auth });
         
-        return sheetsApi; // Trả về đối tượng mới
+        return sheetsApi;
         
     } catch (e) {
         console.error("Lỗi Khởi Tạo Google Sheets API (host-actions local):", e);
         throw new Error("Không thể khởi tạo Google Sheets API.");
     }
 }
+// === KẾT THÚC BẢN VÁ ===
+
 
 /**
  * [CỤC BỘ] Đọc và cache dữ liệu từ Google Sheet.
- * (ĐÃ THÊM DEBUG LOGGING)
+ * (Vẫn giữ Debug Log)
  */
 async function fetchSheetData_local(sheetName) {
     const now = Date.now();
@@ -91,6 +91,7 @@ async function fetchSheetData_local(sheetName) {
         }
         // === KẾT THÚC DEBUG ===
 
+        // === BẢN VÁ: Hàm này giờ sẽ gọi phiên bản fromJSON ===
         const sheets = await getGoogleSheetsAPI_local(); 
         spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
