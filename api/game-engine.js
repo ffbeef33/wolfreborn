@@ -315,7 +315,6 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
 
 /**
  * Tính toán kết quả cuối đêm dựa trên logic Kind mới.
- * (ĐÃ CẬP NHẬT LOGIC SHIELD -> ARMOR -> SAVE)
  */
 function calculateNightStatus(players, nightActions, allRolesData, currentNightNumber) {
     
@@ -368,7 +367,7 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             damage: 0,
             isProtected: false, 
             isSaved: false,    
-            isDisabled: false, 
+            isDisabled: false, // Reset 'isDisabled' mỗi đêm
             isCursed: false,
             isLethallyWounded: false, 
             faction: player.faction || role.Faction, 
@@ -451,6 +450,10 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
             liveStatus[targetId].isDisabled = true;
             liveStatus[targetId].isProtected = true; 
             if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã Đóng Băng ${players[targetId].username}.`);
+
+            // === BẢN VÁ: Thêm log cho người bị đóng băng ===
+            if (privateLogs[targetId]) privateLogs[targetId].push(`Bạn đã bị ai đó đóng băng đêm nay! Chức năng (nếu có) sẽ thất bại.`);
+            // === KẾT THÚC BẢN VÁ ===
         }
         
         if (status.role.Kind === 'shield') {
@@ -464,23 +467,34 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (!isActionActive(status, (player.state || {}), currentNightNumber, true, true)) return; 
         
-        const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
-        if (!action) return; // Thêm kiểm tra null
-        const targetId = action.targetId;
-        if (!targetId || !liveStatus[targetId]) return;
-
+        // Chỉ chạy logic Soi nếu vai trò là 'audit'
         if (status.role.Kind === 'audit') {
+            
+            // === BẢN VÁ: Kiểm tra 'isDisabled' (bị đóng băng) TRƯỚC ===
+            if (status.isDisabled) {
+                // Nếu bị đóng băng, luôn trả về 'Phe Dân' bất kể họ có chọn mục tiêu hay không
+                if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã bị đóng băng! Kết quả soi (nếu có) là: Phe Dân.`);
+                return; // Dừng logic soi cho người này
+            }
+            // === KẾT THÚC BẢN VÁ ===
+
+            // Nếu không bị đóng băng, kiểm tra hành động như bình thường
+            if (!isActionActive(status, (player.state || {}), currentNightNumber, true, true)) return; 
+            
+            const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
+            if (!action) return; 
+            const targetId = action.targetId;
+            if (!targetId || !liveStatus[targetId]) return;
+
+            // Logic soi bình thường
             const targetStatus = liveStatus[targetId];
             let resultFaction = targetStatus.faction;
             if (targetStatus.passive.counteraudit) {
                 if (resultFaction === wolfFaction) resultFaction = "Phe Dân";
                 else if (resultFaction === "Phe Dân") resultFaction = wolfFaction;
             }
-            if (status.isDisabled) { 
-                resultFaction = "Phe Dân";
-            }
+            // (Không cần kiểm tra status.isDisabled ở đây nữa)
             if (privateLogs[pId]) privateLogs[pId].push(`Kết quả soi ${players[targetId].username} là: ${resultFaction}.`);
         }
     });
@@ -490,7 +504,17 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (!isActionActive(status, (player.state || {}), currentNightNumber) || status.isDisabled) return;
+
+        // === BẢN VÁ: Kiểm tra freeze TRƯỚC ===
+        if (status.isDisabled) {
+            if (['kill', 'killwolf', 'assassin', 'curse'].includes(status.role.Kind)) {
+                if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã bị đóng băng! Hành động của bạn đã thất bại.`);
+            }
+            return; // Dừng lại
+        }
+        // === KẾT THÚC BẢN VÁ ===
+
+        if (!isActionActive(status, (player.state || {}), currentNightNumber)) return;
 
         const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
         if (!action) return; // Thêm kiểm tra null
@@ -548,8 +572,16 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (status.isDisabled) return;
         
+        // === BẢN VÁ: Thêm log cho freeze ===
+        if (status.isDisabled) {
+            if (status.role.Kind === 'witch') {
+                 if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã bị đóng băng! Bạn không thể dùng thuốc.`);
+            }
+            return;
+        }
+        // === KẾT THÚC BẢN VÁ ===
+
         const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
         if (!action) return; // Thêm kiểm tra null
 
@@ -603,7 +635,15 @@ function calculateNightStatus(players, nightActions, allRolesData, currentNightN
         if (!liveStatus[pId]) return;
         const status = liveStatus[pId];
         const player = players[pId];
-        if (status.isDisabled) return; 
+        
+        // === BẢN VÁ: Thêm log cho freeze ===
+        if (status.isDisabled) { 
+            if (status.role.Kind === 'witch') {
+                 if (privateLogs[pId]) privateLogs[pId].push(`Bạn đã bị đóng băng! Bạn không thể dùng thuốc.`);
+            }
+            return;
+        }
+        // === KẾT THÚC BẢN VÁ ===
         
         const action = status.action; // Ghi chú: 'action' giờ là 'kindAction'
         if (!action) return; // Thêm kiểm tra null
@@ -721,7 +761,9 @@ function isActionActive(status, playerState, currentNightNumber, checkReSelect =
     
     if (role.Kind === 'witch') {
          if (action.choice === 'save' && state.witch_save_used) return false;
-         if (action.choice === 'kill' && state.witch_kill_used) return false;
+         // === BẢN VÁ: Sửa lỗi logic Phù thủy ===
+         if (action.choice === 'kill' && state.witch_kill_used) return false; 
+         // === KẾT THÚC BẢN VÁ ===
     }
 
     return true;

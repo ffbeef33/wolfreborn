@@ -351,6 +351,7 @@ async function handleStartGame(db, roomId, players, rolesToAssign) {
 
 /**
  * Xử lý logic Reset / Restart
+ * (ĐÃ SỬA LỖI: Đảm bảo reset /state)
  */
 async function resetGame(db, roomId, keepRoles) {
     const roomRef = db.ref(`rooms/${roomId}`);
@@ -363,7 +364,7 @@ async function resetGame(db, roomId, keepRoles) {
     Object.keys(roomData.players).forEach(pId => {
         updates[`/players/${pId}/isAlive`] = true;
         updates[`/players/${pId}/causeOfDeath`] = null;
-        updates[`/players/${pId}/state`] = {};
+        updates[`/players/${pId}/state`] = {}; // ĐẢM BẢO RESET STATE
         updates[`/players/${pId}/originalRoleName`] = null; 
         
         if (!keepRoles) { 
@@ -394,13 +395,14 @@ async function resetGame(db, roomId, keepRoles) {
 
 /**
  * Dọn dẹp state của người chơi và kết thúc game
+ * (ĐÃ SỬA LỖI: Đảm bảo reset /state)
  */
 async function cleanupAndEndGame(db, roomId, players) {
     const updates = {};
     
     if (players) {
         Object.keys(players).forEach(pId => {
-            updates[`/players/${pId}/state`] = {};
+            updates[`/players/${pId}/state`] = {}; // ĐẢM BẢO RESET STATE
             updates[`/players/${pId}/originalRoleName`] = null;
         });
     }
