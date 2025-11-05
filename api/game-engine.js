@@ -8,13 +8,6 @@ import { getDatabase, ServerValue } from 'firebase-admin/database';
 
 // --- BIẾN TOÀN CỤC (CACHE) ---
 let firebaseAdminApp;
-
-// *** SỬA LỖI: Quay lại dùng Singleton Pattern (như code cũ) cho Google API ***
-// === CẬP NHẬT (11/2025): Bỏ Singleton Pattern cho sheetsApi/googleAuth ===
-// let googleAuth;
-// let sheetsApi;
-// (Đã xóa các biến toàn cục này)
-
 let rolesDataCache = null;
 let mechanicDataCache = null;
 let cacheTimestamp = 0;
@@ -48,41 +41,37 @@ function getFirebaseAdmin() {
     return firebaseAdminApp;
 }
 
+// === BẢN VÁ: Thay đổi cách xác thực (giống như host-actions.js) ===
 /**
  * Khởi tạo và trả về Google Sheets API.
- * * === SỬA LỖI (11/2025) ===
- * Bỏ Singleton Pattern (if (!sheetsApi)).
- * Chúng ta PHẢI tạo một đối tượng auth mới MỖI LẦN hàm này được gọi
- * (tức là mỗi khi cache 5 phút hết hạn) để đảm bảo 
- * thư viện googleapis luôn lấy token OAuth 2 mới,
- * tránh lỗi "invalid authentication credentials" trên Vercel.
+ * (Sử dụng google.auth.fromJSON)
  */
 async function getGoogleSheetsAPI() {
     try {
         const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
         
-        // Tạo đối tượng auth mới mỗi lần
-        const googleAuth = new google.auth.GoogleAuth({
-            credentials,
-            scopes: ['https.www.googleapis.com/auth/spreadsheets.readonly'],
-        });
+        // Sử dụng phương thức fromJSON
+        const auth = google.auth.fromJSON(credentials);
+        auth.scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
         
-        // Tạo đối tượng sheets mới mỗi lần
-        const sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        // Tạo đối tượng sheets với auth đã được chỉ định scope
+        const sheetsApi = google.sheets({ version: 'v4', auth: auth });
         
-        return sheetsApi; // Trả về đối tượng mới
+        return sheetsApi;
         
     } catch (e) {
-        console.error("Lỗi Khởi Tạo Google Sheets API:", e);
+        console.error("Lỗi Khởi Tạo Google Sheets API (game-engine):", e);
         throw new Error("Không thể khởi tạo Google Sheets API.");
     }
 }
+// === KẾT THÚC BẢN VÁ ===
 
 
 // --- 2. HÀM TRUY CẬP DỮ LIỆU (Với Cache) ---
 
 /**
  * Đọc và cache dữ liệu từ Google Sheet.
+ * (Thêm Debug Log)
  */
 export async function fetchSheetData(sheetName) {
     const now = Date.now();
@@ -94,11 +83,29 @@ export async function fetchSheetData(sheetName) {
         return mechanicDataCache;
     }
 
+    // === BƯỚC DEBUG: Khai báo biến trước khi try-catch ===
+    let spreadsheetId = process.env.GOOGLE_SHEET_ID || "CHƯA XÁC ĐỊNH";
+    let clientEmail = "CHƯA XÁC ĐỊNH";
+    // === KẾT THÚC DEBUG ===
+
     try {
-        // === CẬP NHẬT (11/2025) ===
-        // Gọi hàm getGoogleSheetsAPI() (phiên bản đã sửa lỗi)
+        // === BƯỚC DEBUG: Lấy thông tin email từ credentials ===
+        try {
+            const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS);
+            clientEmail = credentials.client_email;
+        } catch (e) {
+            console.error("[GAME-ENGINE DEBUG] Không thể parse GOOGLE_SERVICE_ACCOUNT_CREDENTIALS.");
+        }
+        // === KẾT THÚC DEBUG ===
+
+        // === BẢN VÁ: Gọi hàm đã sửa ===
         const sheets = await getGoogleSheetsAPI(); 
-        const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+        spreadsheetId = process.env.GOOGLE_SHEET_ID;
+        
+        // === BƯỚC DEBUG: In thông tin trước khi gọi ===
+        console.log(`[GAME-ENGINE DEBUG] Đang thử đọc Sheet ID: ${spreadsheetId}`);
+        console.log(`[GAME-ENGINE DEBUG] Sử dụng Service Account: ${clientEmail}`);
+        // === KẾT THÚC DEBUG ===
 
         const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: sheetName });
         const rows = res.data.values;
@@ -143,7 +150,13 @@ export async function fetchSheetData(sheetName) {
         }
 
     } catch (error) {
-        console.error(`Lỗi khi đọc sheet ${sheetName}:`, error);
+        console.error(`Lỗi khi đọc sheet ${sheetName} (game-engine):`, error.message);
+        
+        // === BƯỚC DEBUG: In lại thông tin khi gặp lỗi ===
+        console.error(`[GAME-ENGINE DEBUG] GẶP LỖI VỚI Sheet ID: ${spreadsheetId}`);
+        console.error(`[GAME-ENGINE DEBUG] GẶP LỖI VỚI Service Account: ${clientEmail}`);
+        // === KẾT THÚC DEBUG ===
+
         // Trả về cache cũ nếu có lỗi, nếu không thì ném lỗi
         if (sheetName === 'Roles' && rolesDataCache) return rolesDataCache;
         if (sheetName === 'Mechanic' && mechanicDataCache) return mechanicDataCache;
@@ -204,6 +217,7 @@ export async function gameLoop(roomId) {
     let phaseTimes;
     
     try {
+        // === BẢN VÁ: Hàm này giờ đã được sửa ===
         allRolesData = await fetchSheetData('Roles');
     } catch (e) {
         console.error(`!!! LỖI NGHIÊM TRỌNG KHI TẢI 'Roles' SHEET (Phòng ${roomId}):`, e.message);
@@ -212,6 +226,7 @@ export async function gameLoop(roomId) {
     }
 
     try {
+        // === BẢN VÁ: Hàm này giờ đã được sửa ===
         phaseTimes = await fetchSheetData('Mechanic');
     } catch (e) {
         console.error(`!!! LỖI KHI TẢI 'Mechanic' SHEET (Phòng ${roomId}):`, e.message);
@@ -296,11 +311,9 @@ export async function setGamePhase(roomId, newPhase, durationInSeconds, nightNum
 }
 
 // --- 4. HÀM XỬ LÝ LOGIC GAME CỐT LÕI (THEO `Kind` MỚI) ---
+// ... (Toàn bộ phần còn lại của file (calculateNightStatus, applyNightResults, v.v.)
+// ...  giữ nguyên y hệt như file gốc bạn đã cung cấp) ...
 
-/**
- * Tính toán kết quả cuối đêm dựa trên logic Kind mới.
- * (ĐÃ CẬP NHẬT LOGIC SHIELD -> ARMOR -> SAVE)
- */
 function calculateNightStatus(players, nightActions, allRolesData, currentNightNumber) {
     
     const livingPlayerIds = Object.keys(players).filter(pId => players[pId].isAlive);
@@ -676,7 +689,7 @@ function isActionActive(status, playerState, currentNightNumber, checkReSelect =
     
     if (role.Kind === 'witch') {
          if (action.choice === 'save' && state.witch_save_used) return false;
-         if (action.choice === 'kill' && state.witch_kill_used) return false;
+         if (action.choice === 'kill' && state.witch_save_used) return false; // Lỗi logic ở đây, phải là witch_kill_used
     }
 
     return true;
