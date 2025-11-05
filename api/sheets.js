@@ -16,6 +16,27 @@ function getGoogleSheetConfig() {
     }
 }
 
+// === BẢN VÁ: Thêm hàm helper tạo auth mới mỗi lần ===
+async function getGoogleSheetsAPI_local_sheets(isReadOnly = true) {
+    try {
+        const { credentials } = getGoogleSheetConfig();
+        const scopes = isReadOnly
+            ? ['https://www.googleapis.com/auth/spreadsheets.readonly']
+            : ['https://www.googleapis.com/auth/spreadsheets'];
+
+        const googleAuth = new google.auth.GoogleAuth({
+            credentials,
+            scopes: scopes,
+        });
+        const sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        return sheetsApi;
+    } catch (e) {
+        console.error("Lỗi Khởi Tạo Google Sheets API (sheets local):", e);
+        throw new Error("Không thể khởi tạo Google Sheets API.");
+    }
+}
+// === KẾT THÚC BẢN VÁ ===
+
 // --- Hàm xử lý chính ---
 export default async function handler(request, response) {
     response.setHeader('Access-Control-Allow-Origin', '*'); // Cho phép CORS nếu cần
@@ -31,12 +52,11 @@ export default async function handler(request, response) {
     // ========================================================
     if (request.method === 'GET') {
         try {
-            const { credentials, spreadsheetId } = getGoogleSheetConfig();
-            const auth = new google.auth.GoogleAuth({
-                credentials,
-                scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'], // Chỉ cần quyền đọc cho GET
-            });
-            const sheets = google.sheets({ version: 'v4', auth });
+            const { spreadsheetId } = getGoogleSheetConfig();
+
+            // === BẢN VÁ: Gọi helper mới (Read-Only) ===
+            const sheets = await getGoogleSheetsAPI_local_sheets(true);
+            // === KẾT THÚC BẢN VÁ ===
 
             // Lấy sheetName từ query, mặc định là 'Roles' nếu không có
             const { sheetName = 'Roles' } = request.query;
@@ -149,12 +169,11 @@ export default async function handler(request, response) {
     // ========================================================
     if (request.method === 'POST') {
         try {
-            const { credentials, spreadsheetId } = getGoogleSheetConfig();
-             const auth = new google.auth.GoogleAuth({
-                 credentials,
-                 scopes: ['https://www.googleapis.com/auth/spreadsheets'], // Cần quyền ghi cho POST
-             });
-             const sheets = google.sheets({ version: 'v4', auth });
+            const { spreadsheetId } = getGoogleSheetConfig();
+            
+             // === BẢN VÁ: Gọi helper mới (Write) ===
+             const sheets = await getGoogleSheetsAPI_local_sheets(false);
+             // === KẾT THÚC BẢN VÁ ===
 
             const { action, payload } = request.body;
             const gameLogSheetName = 'GameLog'; // Tên sheet log

@@ -17,6 +17,25 @@ function getGoogleSheetConfig() {
     }
 }
 
+// === BẢN VÁ: Thêm hàm helper tạo auth mới mỗi lần ===
+async function getGoogleSheetsAPI_local_login(scopes) {
+    try {
+        const { credentials } = getGoogleSheetConfig();
+        // Tạo đối tượng auth mới mỗi lần
+        const googleAuth = new google.auth.GoogleAuth({
+            credentials,
+            scopes: scopes, // Quyền đọc hoặc ghi
+        });
+        // Tạo đối tượng sheets mới mỗi lần
+        const sheetsApi = google.sheets({ version: 'v4', auth: googleAuth });
+        return sheetsApi;
+    } catch (e) {
+        console.error("Lỗi Khởi Tạo Google Sheets API (login local):", e);
+        throw new Error("Không thể khởi tạo Google Sheets API.");
+    }
+}
+// === KẾT THÚC BẢN VÁ ===
+
 // --- Hàm xử lý chính ---
 export default async function handler(request, response) {
     response.setHeader('Access-Control-Allow-Origin', '*'); // Cho phép CORS nếu cần
@@ -57,12 +76,13 @@ async function handleRegister(request, response, username, password) {
     }
 
     try {
-        const { credentials, spreadsheetId } = getGoogleSheetConfig();
-        const auth = new google.auth.GoogleAuth({
-            credentials,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets'], // Cần quyền ghi
-        });
-        const sheets = google.sheets({ version: 'v4', auth });
+        const { spreadsheetId } = getGoogleSheetConfig();
+
+        // === BẢN VÁ: Gọi helper mới ===
+        const sheets = await getGoogleSheetsAPI_local_login(
+            ['https://www.googleapis.com/auth/spreadsheets'] // Quyền ghi
+        );
+        // === KẾT THÚC BẢN VÁ ===
 
         // 1. Đọc dữ liệu để kiểm tra tên người dùng đã tồn tại chưa
         const readRes = await sheets.spreadsheets.values.get({
@@ -115,12 +135,13 @@ async function handleLogin(request, response, password, type) {
     // Login cho Player (đọc từ Google Sheet)
     if (type === 'player') {
         try {
-            const { credentials, spreadsheetId } = getGoogleSheetConfig();
-            const auth = new google.auth.GoogleAuth({
-                credentials,
-                scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-            });
-            const sheets = google.sheets({ version: 'v4', auth });
+            const { spreadsheetId } = getGoogleSheetConfig();
+
+            // === BẢN VÁ: Gọi helper mới ===
+            const sheets = await getGoogleSheetsAPI_local_login(
+                ['https://www.googleapis.com/auth/spreadsheets.readonly'] // Chỉ quyền đọc
+            );
+            // === KẾT THÚC BẢN VÁ ===
 
             const res = await sheets.spreadsheets.values.get({
                 spreadsheetId,
